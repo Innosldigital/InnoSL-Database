@@ -1,0 +1,148 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* ISL Brand */
+    --isl-purple:        #2D1B69;
+    --isl-purple-mid:    #4A2FA0;
+    --isl-purple-light:  #7B5EA7;
+    --isl-purple-pale:   #EDE8F8;
+    --isl-sky:           #38BDF8;
+    --isl-sky-light:     #BAE6FD;
+    --isl-royal:         #1E40AF;
+    --isl-gold:          #C9821A;
+
+    /* shadcn/ui tokens mapped to ISL brand */
+    --background:        0 0% 97%;
+    --foreground:        252 64% 25%;
+    --card:              0 0% 100%;
+    --card-foreground:   252 64% 15%;
+    --popover:           0 0% 100%;
+    --popover-foreground:252 64% 15%;
+    --primary:           252 64% 28%;
+    --primary-foreground:0 0% 98%;
+    --secondary:         248 40% 95%;
+    --secondary-foreground:252 64% 28%;
+    --muted:             248 30% 95%;
+    --muted-foreground:  252 20% 55%;
+    --accent:            198 95% 60%;
+    --accent-foreground: 252 64% 20%;
+    --destructive:       0 72% 51%;
+    --destructive-foreground:0 0% 98%;
+    --border:            252 30% 88%;
+    --input:             252 30% 88%;
+    --ring:              252 64% 28%;
+    --radius:            0.625rem;
+  }
+
+  .dark {
+    --background:        252 64% 8%;
+    --foreground:        248 30% 92%;
+    --card:              252 64% 11%;
+    --card-foreground:   248 30% 92%;
+    --popover:           252 64% 11%;
+    --popover-foreground:248 30% 92%;
+    --primary:           198 95% 60%;
+    --primary-foreground:252 64% 10%;
+    --secondary:         252 40% 18%;
+    --secondary-foreground:248 30% 85%;
+    --muted:             252 40% 16%;
+    --muted-foreground:  252 20% 55%;
+    --accent:            252 64% 28%;
+    --accent-foreground: 248 30% 92%;
+    --destructive:       0 63% 42%;
+    --destructive-foreground:0 0% 98%;
+    --border:            252 40% 20%;
+    --input:             252 40% 20%;
+    --ring:              198 95% 60%;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  h1 { @apply text-2xl font-semibold tracking-tight; }
+  h2 { @apply text-xl font-semibold tracking-tight; }
+  h3 { @apply text-lg font-medium; }
+}
+
+@layer components {
+  /* ISL Topbar */
+  .isl-topbar {
+    background: var(--isl-purple);
+    @apply flex items-center h-[52px] px-5 gap-3 sticky top-0 z-50;
+  }
+
+  /* ISL Sidebar */
+  .isl-sidebar {
+    background: var(--isl-purple);
+    @apply flex flex-col w-full border-b border-white/10 pt-3 md:w-[210px] md:min-h-screen md:border-b-0;
+  }
+
+  /* ISL Card */
+  .isl-card {
+    @apply bg-card border border-border rounded-xl overflow-hidden;
+  }
+
+  /* Stat card */
+  .stat-card {
+    @apply isl-card p-4 cursor-pointer hover:border-isl-purple-light transition-colors;
+  }
+
+  /* Data table styles */
+  .data-table th {
+    @apply px-3 py-2 text-left text-[10px] font-medium text-muted-foreground
+           uppercase tracking-wider border-b border-border bg-muted/40 select-none cursor-pointer;
+  }
+  .data-table td {
+    @apply px-3 py-2.5 text-sm border-b border-border text-foreground;
+  }
+  .data-table tr:last-child td { @apply border-b-0; }
+  .data-table tr:hover td { @apply bg-isl-purple-pale/40; }
+
+  /* Pill / badge */
+  .pill {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium;
+  }
+  .pill-female  { @apply bg-pink-100 text-pink-800; }
+  .pill-male    { @apply bg-slate-100 text-slate-700; }
+  .pill-youth   { @apply bg-blue-100 text-blue-800; }
+  .pill-winner  { @apply bg-green-100 text-green-800; }
+  .pill-fpn     { @apply bg-amber-100 text-amber-800; }
+  .pill-fiw     { @apply bg-purple-100 text-purple-800; }
+  .pill-gew     { @apply bg-blue-100 text-blue-800; }
+  .pill-osvp    { @apply bg-pink-100 text-pink-800; }
+  .pill-d2a     { @apply bg-orange-100 text-orange-700; }
+  .pill-sledp   { @apply bg-green-100 text-green-800; }
+
+  /* Pipeline step */
+  .pipe-step {
+    @apply flex-1 flex flex-col items-center py-3 px-2 text-center
+           border border-border bg-card cursor-pointer transition-all;
+  }
+  .pipe-step.active { @apply bg-isl-purple-pale border-isl-purple-light; }
+  .pipe-step.done   { @apply bg-green-50 border-green-300; }
+
+  /* Equity bar */
+  .equity-bar-bg { @apply flex-1 h-1.5 bg-isl-purple-pale rounded-full overflow-hidden; }
+  .equity-bar    { @apply h-1.5 rounded-full transition-all duration-500; }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar       { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #7B5EA7; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #4A2FA0; }
+
+/* Chart tooltips */
+.recharts-tooltip-wrapper .recharts-default-tooltip {
+  border-radius: 8px !important;
+  border: 0.5px solid #EDE8F8 !important;
+  background: white !important;
+  font-size: 12px !important;
+}

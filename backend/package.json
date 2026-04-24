@@ -1,0 +1,16 @@
+{
+  "name": "innovationsl-backend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "python workers/sync_worker.py",
+    "migrate": "python -m alembic upgrade head",
+    "seed": "python database/seeds/seed_events.py",
+    "worker": "python workers/sync_worker.py",
+    "clean": "python workers/cleaning_worker.py",
+    "dev:watch": "nodemon --exec python workers/sync_worker.py"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}

@@ -1,0 +1,1 @@
+export { FirstFemaleWidget } from "./index";
