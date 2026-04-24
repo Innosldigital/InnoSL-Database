@@ -27,9 +27,8 @@ export default function ImportPage() {
         title="Data import & cleaning"
         subtitle="Upload, map, validate and approve new data · all sources 2018–2026"
         actions={[
-          { label: "Back to dashboard", href: "/dashboard", variant: "secondary" },
           { label: "Run health audit", variant: "secondary" },
-          { label: "View queue", href: "/import/queue", variant: "primary" },
+          { label: "View queue",       href: "/import/queue", variant: "primary" },
         ]}
       />
 
@@ -38,10 +37,10 @@ export default function ImportPage() {
       <div className="isl-card">
         {step === 0 && (
           <ImportUploadZone
-            onUploaded={(data, batch, stgId) => {
+            onUploaded={(data, batch, sid) => {
               setUploadedData(data);
               setBatchId(batch);
-              setStagingId(stgId);
+              setStagingId(sid ?? "");
               setStep(1);
             }}
           />
@@ -49,7 +48,11 @@ export default function ImportPage() {
         {step === 1 && (
           <FieldMapper
             data={uploadedData}
-            onConfirm={(map, table) => { setFieldMap(map); setTargetTable(table); setStep(2); }}
+            onConfirm={(map, table) => {
+              setFieldMap(map);
+              setTargetTable(table);
+              setStep(2);
+            }}
           />
         )}
         {step === 2 && (
@@ -71,13 +74,13 @@ export default function ImportPage() {
             batchId={batchId}
             stagingId={stagingId}
             fieldMap={fieldMap}
-            data={uploadedData}
             targetTable={targetTable}
+            data={uploadedData}
           />
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <div className="grid grid-cols-2 gap-4">
         <ConnectedSources />
         <CleaningRules />
       </div>
