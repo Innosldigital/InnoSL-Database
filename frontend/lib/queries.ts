@@ -362,16 +362,22 @@ export async function getMonthlyActivity(year: number) {
   return { events, participants };
 }
 
+const EQUITY_ZERO: EquityDashboard = {
+  total_beneficiaries: 0, female_beneficiaries: 0, girls_under_18: 0,
+  youth_beneficiaries: 0, aged_beneficiaries: 0, pwd_beneficiaries: 0,
+  regional_beneficiaries: 0, repeat_beneficiaries: 0, pct_female: 0,
+};
+
 export async function getDashboardKPIs() {
   const supabase = createAdminClient();
   const year = new Date().getFullYear();
 
   const [equity, byYear, capital, sectors, monthly] = await Promise.all([
-    getEquityDashboard(),
-    getBeneficiariesByYear(),
-    getCapitalSummary(),
-    getSectorBreakdown(),
-    getMonthlyActivity(year),
+    getEquityDashboard().catch(() => EQUITY_ZERO),
+    getBeneficiariesByYear().catch(() => [] as BeneficiaryByYear[]),
+    getCapitalSummary().catch(() => [] as CapitalSummary[]),
+    getSectorBreakdown().catch(() => [] as { sector: string; count: number }[]),
+    getMonthlyActivity(year).catch(() => ({ events: Array(12).fill(0), participants: Array(12).fill(0) })),
   ]);
 
   const [eventsRes, totalOrgsRes, womenLedOrgsRes] = await Promise.all([
@@ -380,8 +386,8 @@ export async function getDashboardKPIs() {
     supabase.from("organisation").select("org_id", { count: "exact", head: true }).eq("woman_led", true),
   ]);
 
-  const totalUSD        = capital.reduce((acc, r) => acc + (r.total_usd    ?? 0), 0);
-  const usdToWomen      = capital.reduce((acc, r) => acc + (r.usd_to_women ?? 0), 0);
+  const totalUSD          = capital.reduce((acc, r) => acc + (r.total_usd    ?? 0), 0);
+  const usdToWomen        = capital.reduce((acc, r) => acc + (r.usd_to_women ?? 0), 0);
   const capitalToWomenPct = totalUSD > 0 ? Math.round((usdToWomen / totalUSD) * 100) : 0;
   const womenLedPct       = (totalOrgsRes.count ?? 0) > 0
     ? Math.round(((womenLedOrgsRes.count ?? 0) / (totalOrgsRes.count ?? 1)) * 100)
@@ -393,10 +399,10 @@ export async function getDashboardKPIs() {
     capital,
     sectors,
     monthly,
-    events_count:          eventsRes.count ?? 0,
-    total_usd:             totalUSD,
-    capital_to_women_pct:  capitalToWomenPct,
-    women_led_pct:         womenLedPct,
+    events_count:         eventsRes.count ?? 0,
+    total_usd:            totalUSD,
+    capital_to_women_pct: capitalToWomenPct,
+    women_led_pct:        womenLedPct,
   };
 }
 

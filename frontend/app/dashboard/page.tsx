@@ -1,16 +1,23 @@
 import { Suspense } from "react";
+import dynamic from "next/dynamic";
 import { getDashboardKPIs } from "@/lib/queries";
 import { KPIGrid } from "@/components/dashboard/KPIGrid";
-import { BeneficiaryChart } from "@/components/dashboard/BeneficiaryChart";
-import { MonthlyActivityChart } from "@/components/dashboard/MonthlyActivityChart";
-import { CapitalChart } from "@/components/dashboard/CapitalChart";
-import { GenderSplitChart } from "@/components/dashboard/GenderSplitChart";
-import { SectorBreakdownChart } from "@/components/dashboard/SectorBreakdownChart";
 import { EquityPanel } from "@/components/dashboard/EquityPanel";
 import { ProgrammeCalendar } from "@/components/dashboard/ProgrammeCalendar";
-import { GrowthTrendChart } from "@/components/dashboard/GrowthTrendChart";
 import { YearFilter } from "@/components/shared/YearFilter";
 import { PageHeader } from "@/components/shared/PageHeader";
+
+function ChartSkeleton({ h = "h-56" }: { h?: string }) {
+  return <div className={`${h} animate-pulse rounded-xl bg-white/60`} />;
+}
+
+// Recharts uses useLayoutEffect internally — load client-only to avoid hydration mismatch
+const BeneficiaryChart     = dynamic(() => import("@/components/dashboard/BeneficiaryChart").then(m => ({ default: m.BeneficiaryChart })), { ssr: false, loading: () => <ChartSkeleton /> });
+const MonthlyActivityChart = dynamic(() => import("@/components/dashboard/MonthlyActivityChart").then(m => ({ default: m.MonthlyActivityChart })), { ssr: false, loading: () => <ChartSkeleton /> });
+const CapitalChart         = dynamic(() => import("@/components/dashboard/CapitalChart").then(m => ({ default: m.CapitalChart })), { ssr: false, loading: () => <ChartSkeleton /> });
+const GenderSplitChart     = dynamic(() => import("@/components/dashboard/GenderSplitChart").then(m => ({ default: m.GenderSplitChart })), { ssr: false, loading: () => <ChartSkeleton /> });
+const SectorBreakdownChart = dynamic(() => import("@/components/dashboard/SectorBreakdownChart").then(m => ({ default: m.SectorBreakdownChart })), { ssr: false, loading: () => <ChartSkeleton /> });
+const GrowthTrendChart     = dynamic(() => import("@/components/dashboard/GrowthTrendChart").then(m => ({ default: m.GrowthTrendChart })), { ssr: false, loading: () => <ChartSkeleton h="h-36" /> });
 
 export const metadata = { title: "Analytics Dashboard" };
 
@@ -81,8 +88,4 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       </Suspense>
     </div>
   );
-}
-
-function ChartSkeleton({ h = "h-56" }: { h?: string }) {
-  return <div className={`${h} animate-pulse rounded-xl bg-white/60`} />;
 }
