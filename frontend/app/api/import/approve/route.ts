@@ -63,6 +63,10 @@ function detectTableFromData(records: Record<string, unknown>[]): string {
   if (has("grant_type") || has("disbursement_date") || has("amount_usd")) return "grant_capital";
   if (has("event_type") || has("edition_year") || (has("date_start") && has("venue"))) return "event";
   if (has("woman_led") || has("org_type") || has("reg_number") || has("founder")) return "organisation";
+  if (has("cohort_id") && has("org_id") && !has("event_id")) return "cohort_member";
+  if (has("cohort_type") || has("cohort_name") || (has("programme") && has("cohort"))) return "cohort";
+  if (has("training_type") || has("facilitator") || has("training_session")) return "training_session";
+  if (has("vip_tier") || has("relationship_owner") || has("vip_contact")) return "vip_contact";
   return "person";
 }
 
@@ -211,6 +215,49 @@ export async function POST(req: Request) {
           ({ error } = await db.from("eso_partner").upsert(
             { ...record },
             { onConflict: "name", ignoreDuplicates: false }
+          ));
+          break;
+        }
+
+        case "cohort": {
+          ({ error } = await db.from("cohort").upsert(
+            { ...record },
+            { onConflict: "isl_ref", ignoreDuplicates: false }
+          ));
+          break;
+        }
+
+        case "cohort_member": {
+          const cid = record.cohort_id
+            ? (await db.from("cohort").select("cohort_id").eq("isl_ref", String(record.cohort_id)).maybeSingle()).data?.cohort_id ?? String(record.cohort_id)
+            : null;
+          const oid2 = record.org_id    ? await resolveOrgId(String(record.org_id),     db) : null;
+          const pid2 = record.person_id ? await resolvePersonId(String(record.person_id), db) : null;
+          if (!cid)  { results.errors.push(`Cohort not found: "${record.cohort_id}"`); continue; }
+          if (!oid2) { results.errors.push(`Org not found: "${record.org_id}"`);       continue; }
+          ({ error } = await db.from("cohort_member").upsert(
+            { cohort_id: cid, org_id: oid2,
+              ...(pid2 ? { person_id: pid2 } : {}),
+              graduated: record.graduated === "TRUE" || record.graduated === true },
+            { onConflict: "cohort_id,org_id", ignoreDuplicates: false }
+          ));
+          break;
+        }
+
+        case "training_session": {
+          const teid = record.event_id ? await resolveEventId(String(record.event_id), db) : null;
+          ({ error } = await db.from("training_session").upsert(
+            { ...record, ...(teid ? { event_id: teid } : { event_id: null }) },
+            { onConflict: "isl_ref", ignoreDuplicates: false }
+          ));
+          break;
+        }
+
+        case "vip_contact": {
+          const vpid = record.person_id ? await resolvePersonId(String(record.person_id), db) : null;
+          ({ error } = await db.from("vip_contact").upsert(
+            { ...record, ...(vpid ? { person_id: vpid } : {}) },
+            { onConflict: "person_id", ignoreDuplicates: false }
           ));
           break;
         }
