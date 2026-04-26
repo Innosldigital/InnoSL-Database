@@ -63,22 +63,31 @@ function detectTableFromData(records: Record<string, unknown>[]): string {
       has("esotrainedflag") || has("esotrained") || has("cohortnumber") ||
       has("jobscreated") && has("startdate")) return "cohort";
 
-  // training_session: topic/session_type + any session indicator OR satisfaction_score alone
+  // training_session: topic/session_type + any session indicator (including speaker_name, activity_type)
   if (has("satisfactionscore") || has("prescore") || has("postscore") ||
       ((has("topic") || has("sessiontype")) &&
-       (has("facilitator") || has("sessiondate") || has("programmefunder") || has("totalattended")))) return "training_session";
+       (has("facilitator") || has("sessiondate") || has("programmefunder") || has("totalattended") ||
+        has("speakername") || has("activitytype")))) return "training_session";
 
   // vip_contact: contact_type + relationship indicator
   if (has("contacttype") && (has("relationshipowner") || has("lastengaged"))) return "vip_contact";
 
-  // mel_report
-  if (has("kpiname") || has("baseline") || (has("target") && has("actual") && has("period"))) return "mel_report";
+  // diagnostic: standard fields + ILO/TA evaluations + competitiveness scorecards
+  if (
+    has("diagdate") || has("toolused") || has("lendability") || has("loanpurpose") ||
+    has("tabusiness") || has("tafinancial") || (has("tahr") && has("tamarketing")) ||
+    (has("overallscore") && has("strategicscore")) ||
+    (has("assessmentdate") && has("assessor"))
+  ) return "diagnostic";
+
+  // mel_report: KPI reports + aggregate survey data
+  if (
+    has("kpiname") || has("baseline") || (has("target") && has("actual") && has("period")) ||
+    has("totalrespondents") || (has("programme") && has("year") && has("pctfemale"))
+  ) return "mel_report";
 
   // eso_partner
   if (has("esotype") || has("trainedbyisl") || has("activepartner")) return "eso_partner";
-
-  // diagnostic
-  if (has("diagdate") || has("toolused") || has("lendability") || has("loanpurpose")) return "diagnostic";
 
   // attendance: person_id + event_id + attended/role
   if (has("roleat") || (has("personid") && has("eventid") && has("attended"))) return "attendance";
@@ -92,8 +101,9 @@ function detectTableFromData(records: Record<string, unknown>[]): string {
   // event
   if (has("eventtype") || has("editionyear") || (has("datestart") && has("venue"))) return "event";
 
-  // organisation
-  if (has("womanled") || has("orgtype") || has("founderp") || has("tradingname")) return "organisation";
+  // organisation (after diagnostic so ILO evals with is_woman_led don't mis-detect)
+  if (has("orgtype") || has("founderp") || has("tradingname") ||
+      (has("womanled") && !has("tabusiness") && !has("tafinancial"))) return "organisation";
 
   return "person";
 }
@@ -448,6 +458,12 @@ export async function POST(req: Request) {
         // ── TRAINING SESSION ──────────────────────────────────
         // training_session has no isl_ref column — dedup by topic + session_date
         case "training_session": {
+          // Remap CSV alias columns → schema field names before sanitise
+          if (record.speaker_name  && !record.facilitator)    record.facilitator    = record.speaker_name;
+          if (record.date          && !record.session_date)   record.session_date   = record.date;
+          if (record.activity_type && !record.session_type)   record.session_type   = record.activity_type;
+          if (record.speaker_org   && !record.programme_funder) record.programme_funder = record.speaker_org;
+
           const eid = record.event_id ? await resolveEventId(String(record.event_id), db) : null;
           const trainRec = sanitise(
             { ...record, ...(eid ? { event_id: eid } : { event_id: null }) },
