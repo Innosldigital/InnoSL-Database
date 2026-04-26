@@ -167,6 +167,12 @@ const ALLOWED: Record<string, Set<string>> = {
     "topic","facilitator","facilitator_person_id","session_date","duration_hours","format",
     "total_registered","total_attended","female_count","male_count","youth_count",
     "satisfaction_score","pre_score","post_score","report_doc_link","materials_link","notes","created_at"]),
+  mel_report: new Set(["report_id","isl_ref","period","period_start","period_end",
+    "programme","funder","report_type","kpi_name","baseline","target","actual","status",
+    "female_beneficiaries","male_beneficiaries","youth_beneficiaries","aged_beneficiaries",
+    "pwd_beneficiaries","regional_beneficiaries","jobs_created_female","jobs_created_male",
+    "revenue_generated","satisfaction","report_doc_link","raw_data_link",
+    "prepared_by","approved_by","notes","created_at"]),
 };
 
 const DIAG_EXTRA = new Set(["business_age","employees","revenue_band","loan_purpose",
@@ -330,10 +336,29 @@ export async function POST(req: Request) {
             }
           }
 
+          // Alias common alternative column names before sanitise strips them
+          if (record.assessment_date && !record.diag_date) record = { ...record, diag_date: record.assessment_date };
+          if (record.evaluation_date && !record.diag_date) record = { ...record, diag_date: record.evaluation_date };
+          if (record.date            && !record.diag_date) record = { ...record, diag_date: record.date };
+
+          // Infer tool_used from column pattern when not explicitly provided
+          // (tool_used is NOT NULL enum: ISL_Scorecard | SME_TA_Diagnosis | ILO_Acceleration | Lendability_Index | VIRAL_Assessment | Other)
+          if (!record.tool_used) {
+            const rKeys = Object.keys(record).map(k => k.toLowerCase());
+            const hasLend  = rKeys.some(k => k.includes("lendability") || k.includes("loan_purpose"));
+            const hasTA    = rKeys.some(k => k.startsWith("ta_"));
+            const hasScore = rKeys.some(k => k.includes("strategic_score") || k.includes("competitiveness"));
+            record = {
+              ...record,
+              tool_used: hasLend ? "Lendability_Index" : hasTA ? "ILO_Acceleration" : hasScore ? "ISL_Scorecard" : "Other",
+            };
+          }
+
           const diagRec = sanitise({ ...record, org_id: oid }, "diagnostic");
 
-          if (!diagRec.diag_date) { results.errors.push(`Diagnostic: diag_date required`); continue; }
-          if (!diagRec.tool_used) { results.errors.push(`Diagnostic: tool_used required`); continue; }
+          // Both columns are NOT NULL — provide safe defaults rather than skipping the row
+          if (!diagRec.diag_date) diagRec.diag_date = new Date().toISOString().split("T")[0];
+          if (!diagRec.tool_used) diagRec.tool_used = "Other";
 
           if (diagRec.isl_ref) {
             ({ error } = await db.from("diagnostic").upsert(diagRec, { onConflict: "isl_ref", ignoreDuplicates: false }));
@@ -379,10 +404,17 @@ export async function POST(req: Request) {
 
         // ── MEL REPORT ────────────────────────────────────────
         case "mel_report": {
-          if (record.isl_ref) {
-            ({ error } = await db.from("mel_report").upsert({ ...record }, { onConflict: "isl_ref", ignoreDuplicates: false }));
+          const melRec = sanitise({ ...record }, "mel_report");
+
+          // period is NOT NULL — default to year column or "Unknown"
+          if (!melRec.period) melRec.period = record.year ? String(record.year) : "Unknown";
+          // programme is NOT NULL
+          if (!melRec.programme) { results.errors.push("mel_report: programme is required"); continue; }
+
+          if (melRec.isl_ref) {
+            ({ error } = await db.from("mel_report").upsert(melRec, { onConflict: "isl_ref", ignoreDuplicates: false }));
           } else {
-            ({ error } = await db.from("mel_report").insert({ ...record }));
+            ({ error } = await db.from("mel_report").insert(melRec));
           }
           break;
         }
