@@ -38,8 +38,10 @@ export default async function PeoplePage({ searchParams }: Props) {
         title="People"
         subtitle="All beneficiaries, judges, speakers, hosts, exhibitors and contacts"
         actions={[
-          { label: "Export CSV", href: "/api/people/export", variant: "secondary" },
-          { label: "Add person", href: "/people/new", variant: "primary" },
+          { label: "Export CSV",        href: "/api/people/export",              variant: "secondary" },
+          { label: "Download template", href: "/api/people/export?template=1",   variant: "secondary" },
+          { label: "Import CSV →",      href: "/import",                         variant: "secondary" },
+          { label: "Add person",        href: "/people/new",                     variant: "primary"   },
         ]}
       />
 

@@ -1,252 +1,351 @@
 "use client";
 import { useState, useMemo } from "react";
-import { toast }             from "sonner";
+import { toast } from "sonner";
 
-// ── All schema fields grouped by table ─────────────────────────
+// ── All schema fields grouped by target table ─────────────────
 const TABLE_FIELDS: Record<string, string[]> = {
   person: [
-    "isl_ref","full_name","preferred_name","gender","date_of_birth","age_raw","age_group",
-    "nationality","nin","phone_primary","phone_secondary",
-    "email_primary","email_secondary","location","district","region",
-    "is_woman","is_girl","is_youth","is_aged","is_pwd",
-    "is_repeat_beneficiary","is_outside_freetown",
-    "first_engagement_date","first_programme","record_status","data_sources",
+    "isl_ref","full_name","preferred_name","gender","date_of_birth","age_group","age_raw",
+    "nationality","nin","phone_primary","phone_secondary","email_primary","email_secondary",
+    "location","district","region","is_woman","is_girl","is_youth","is_aged","is_pwd",
+    "is_repeat_beneficiary","is_outside_freetown","first_engagement_date","first_programme",
+    "record_status","import_status","data_sources","notes",
   ],
   organisation: [
-    "org_id","isl_ref","name","sector","sub_sector","stage","org_type",
-    "reg_number","founded_date","location","district","website","description",
-    "woman_led","youth_led","diaspora_led","active","founder_person_id","data_sources",
+    "org_id","isl_ref","name","sector","sub_sector","stage","org_type","reg_number",
+    "founded_date","location","district","website","description","founder_person_id",
+    "woman_led","youth_led","diaspora_led","active","data_sources",
   ],
   event: [
-    "isl_ref","name","event_type","programme","edition_year","edition_number",
-    "theme","date_start","date_end","venue","city","funder",
-    "partner_organisations","report_doc_link","drive_folder_link","data_sources",
+    "isl_ref","name","event_type","programme","edition_year","edition_number","theme",
+    "date_start","date_end","venue","city","funder","partner_organisations",
+    "total_registered","total_attended","female_count","male_count","youth_count",
+    "report_doc_link","drive_folder_link","notes","data_sources",
   ],
   attendance: [
     "person_id","event_id","role_at_event","registered","attended",
     "day_number","source_form","import_batch","notes",
   ],
   pitch: [
-    "isl_ref","event_id","person_id","org_id","application_code",
-    "theme","category","sub_category","idea_description","pitch_stage",
-    "score","rank","winner_flag","finalist_flag","prize_amount","prize_currency","prize_type",
-    "first_female_flag","first_time_flag","repeat_pitcher_flag",
-    "pitch_deck_link","feedback_doc_link","notes","data_sources",
+    "isl_ref","event_id","person_id","org_id","application_code","theme","category",
+    "idea_description","pitch_stage","score","rank","winner_flag","finalist_flag",
+    "prize_amount","prize_currency","prize_type","first_female_flag","first_time_flag",
+    "repeat_pitcher_flag","pitch_deck_link","feedback_doc_link","notes","data_sources",
   ],
   diagnostic: [
-    "isl_ref","org_id","contact","diag_date","tool_used","sector",
-    "business_age","employees","revenue_band","loan_purpose",
-    "has_business_plan","profitability","growth_sector","capacity_utilisation",
-    "has_qa_system","has_sales_strategy","market_reach","financial_records",
-    "management_accounts","loan_history","finance_separation","hr_policy",
-    "payroll_system","software_used","main_challenge","ta_received",
-    "woman_led_flag","youth_led_flag","referral_source","data_sources",
+    "isl_ref","org_id","contact","assessor","diag_date","tool_used","sector",
+    "business_age","employees","revenue_band","loan_purpose","has_business_plan",
+    "profitability","growth_sector","capacity_utilisation","has_qa_system",
+    "has_sales_strategy","market_reach","financial_records","management_accounts",
+    "loan_history","finance_separation","hr_policy","payroll_system","software_used",
+    "main_challenge","ta_received","woman_led_flag","youth_led_flag","referral_source",
+    "strategic_score","process_score","support_score","overall_score","tier",
+    "lendability_score","gap_priority","scorecard_doc_link","data_sources",
   ],
-  grant_capital: [
-    "isl_ref","org_id","person_id","funder","programme","grant_type",
-    "amount_local","amount_usd","currency","disbursement_date","conditions",
-    "recipient_gender","recipient_youth","woman_led_business","recipient_sector",
-    "milestone_1","milestone_2","milestone_3","outcome_jobs","outcome_revenue",
-    "repayment_status","agreement_doc_link","data_sources",
+  eso_partner: [
+    "eso_id","name","eso_type","country","city","focus_sectors",
+    "trained_by_isl","training_date","active_partner","funder",
+    "contact_person","website","programmes_collab","data_sources",
+  ],
+  training_session: [
+    "isl_ref","event_id","programme_funder","session_type","topic","facilitator",
+    "facilitator_person_id","session_date","duration_hours","format",
+    "total_registered","total_attended","female_count","male_count","youth_count",
+    "satisfaction_score","data_sources",
   ],
   mel_report: [
-    "isl_ref","period","programme","funder","period_start","period_end","report_type",
+    "isl_ref","period","period_start","period_end","programme","funder","report_type",
     "kpi_name","baseline","target","actual","status",
     "female_beneficiaries","male_beneficiaries","youth_beneficiaries",
     "aged_beneficiaries","pwd_beneficiaries","regional_beneficiaries",
     "jobs_created_female","jobs_created_male","revenue_generated","satisfaction",
-    "prepared_by","report_doc_link","data_sources",
+    "report_doc_link","prepared_by","approved_by","data_sources",
   ],
-  eso_partner: [
-    "eso_id","name","eso_type","country","city","focus_sectors",
-    "trained_by_isl","active_partner","funder","contact_person","website",
-    "programmes_collab","data_sources",
-  ],
-};
-
-// ── Detect which table this CSV belongs to based on column names ─
-function detectTable(fields: string[]): string {
-  const fs = fields.map(f => f.toLowerCase());
-  const has = (k: string) => fs.some(f => f.includes(k));
-
-  if (has("role_at_event") || (has("person_id") && has("event_id") && has("attended")))
-    return "attendance";
-  if (has("diag_date") || has("tool_used") || has("lendability") || has("diag_id") ||
-      (has("org_id") && has("has_business_plan")))
-    return "diagnostic";
-  if (has("pitch_id") || has("winner_flag") || has("first_female_flag") ||
-      (has("org_id") && has("event_id") && has("idea_description")))
-    return "pitch";
-  if (has("grant_type") || has("disbursement_date") || has("amount_usd") ||
-      (has("funder") && has("org_id") && has("repayment_status")))
-    return "grant_capital";
-  if (has("kpi_name") || has("baseline") || (has("target") && has("actual") && has("period")))
-    return "mel_report";
-  if (has("event_type") || has("edition_year") || has("date_start") ||
-      (has("venue") && has("funder")))
-    return "event";
-  if (has("eso_type") || has("trained_by_isl") || has("active_partner"))
-    return "eso_partner";
-  if (has("woman_led") || has("org_type") || (has("name") && has("sector") && has("stage")))
-    return "organisation";
-  return "person";
-}
-
-// ── Auto-map a single source column to the best schema field ────
-function autoMap(src: string, table: string): string {
-  const fields = TABLE_FIELDS[table] ?? TABLE_FIELDS.person;
-  const s2 = src.toLowerCase().replace(/[^a-z0-9_]/g, "");
-
-  // Exact match first
-  if (fields.includes(src))  return src;
-  if (fields.includes(s2))   return s2;
-
-  if (table === "attendance") {
-    if (s2.includes("personid") || s2 === "person_id") return "person_id";
-    if (s2.includes("eventid")  || s2 === "event_id")  return "event_id";
-    if (s2.includes("role"))                            return "role_at_event";
-    if (s2.includes("register"))                        return "registered";
-    if (s2.includes("attend"))                          return "attended";
-    if (s2.includes("source") || s2.includes("form"))  return "source_form";
-    if (s2.includes("day"))                             return "day_number";
-    if (s2.includes("batch"))                           return "import_batch";
-  }
-
-  if (table === "diagnostic") {
-    if (s2.includes("orgid") || s2 === "org_id")        return "org_id";
-    if (s2.includes("islref") || s2 === "isl_ref")      return "isl_ref";
-    if (s2.includes("diagdate") || s2.includes("diagnosisdate")) return "diag_date";
-    if (s2.includes("tool"))                            return "tool_used";
-    if (s2.includes("sector"))                          return "sector";
-    if (s2.includes("womanlead"))                       return "woman_led_flag";
-    if (s2.includes("youthlead"))                       return "youth_led_flag";
-    if (s2.includes("referral"))                        return "referral_source";
-    if (s2.includes("challenge"))                       return "main_challenge";
-    if (s2.includes("revenue"))                         return "revenue_band";
-    if (s2.includes("profit"))                          return "profitability";
-    if (s2.includes("employee"))                        return "employees";
-    if (s2.includes("loanpurpose"))                     return "loan_purpose";
-    if (s2.includes("businessplan") || s2.includes("hasplan")) return "has_business_plan";
-    if (s2.includes("payroll"))                         return "payroll_system";
-    if (s2.includes("hr"))                              return "hr_policy";
-  }
-
-  if (table === "pitch") {
-    if (s2.includes("eventid"))                         return "event_id";
-    if (s2.includes("personid"))                        return "person_id";
-    if (s2.includes("orgid"))                           return "org_id";
-    if (s2.includes("islref"))                          return "isl_ref";
-    if (s2.includes("winner"))                          return "winner_flag";
-    if (s2.includes("finalist"))                        return "finalist_flag";
-    if (s2.includes("firstfemale"))                     return "first_female_flag";
-    if (s2.includes("category"))                        return "category";
-    if (s2.includes("idea") || s2.includes("description")) return "idea_description";
-    if (s2.includes("prize") && s2.includes("amount")) return "prize_amount";
-    if (s2.includes("score"))                           return "score";
-    if (s2.includes("rank"))                            return "rank";
-    if (s2.includes("deck"))                            return "pitch_deck_link";
-    if (s2.includes("note"))                            return "notes";
-  }
-
-  if (table === "mel_report") {
-    if (s2.includes("kpi") || s2.includes("indicator")) return "kpi_name";
-    if (s2.includes("baseline"))                        return "baseline";
-    if (s2.includes("target"))                          return "target";
-    if (s2.includes("actual"))                          return "actual";
-    if (s2.includes("status"))                          return "status";
-    if (s2.includes("period") && s2.includes("start")) return "period_start";
-    if (s2.includes("period") && s2.includes("end"))   return "period_end";
-    if (s2.includes("period"))                          return "period";
-    if (s2.includes("funder"))                          return "funder";
-    if (s2.includes("female") && s2.includes("ben"))   return "female_beneficiaries";
-    if (s2.includes("male") && s2.includes("ben"))     return "male_beneficiaries";
-    if (s2.includes("youth") && s2.includes("ben"))    return "youth_beneficiaries";
-    if (s2.includes("satisfaction"))                    return "satisfaction";
-  }
-
-  if (table === "event") {
-    if (s2.includes("islref"))                          return "isl_ref";
-    if (s2.includes("eventtype"))                       return "event_type";
-    if (s2.includes("programme"))                       return "programme";
-    if (s2.includes("year"))                            return "edition_year";
-    if (s2.includes("theme"))                           return "theme";
-    if (s2.includes("datestart") || s2.includes("startdate")) return "date_start";
-    if (s2.includes("dateend")   || s2.includes("enddate"))   return "date_end";
-    if (s2.includes("venue"))                           return "venue";
-    if (s2.includes("city"))                            return "city";
-    if (s2.includes("funder"))                          return "funder";
-  }
-
-  if (table === "organisation") {
-    if (s2.includes("orgid"))                           return "org_id";
-    if (s2.includes("islref"))                          return "isl_ref";
-    if (s2.includes("name"))                            return "name";
-    if (s2.includes("sector"))                          return "sector";
-    if (s2.includes("stage"))                           return "stage";
-    if (s2.includes("womanlead"))                       return "woman_led";
-    if (s2.includes("youthlead"))                       return "youth_led";
-    if (s2.includes("founder"))                         return "founder_person_id";
-    if (s2.includes("location"))                        return "location";
-    if (s2.includes("active"))                          return "active";
-  }
-
-  // Person / generic fallback
-  if (s2.includes("fullname") || s2 === "full_name")   return "full_name";
-  if (s2.includes("islref")   || s2 === "isl_ref")     return "isl_ref";
-  if (s2.includes("email"))                             return "email_primary";
-  if (s2.includes("phone") || s2.includes("whatsapp")) return "phone_primary";
-  if (s2.includes("gender") || s2.includes("sex"))     return "gender";
-  if (s2.includes("agegroup") || s2 === "age_group")   return "age_group";
-  if (s2.includes("age"))                               return "age_raw";
-  if (s2.includes("dob") || s2.includes("birth"))      return "date_of_birth";
-  if (s2.includes("location") || s2.includes("city"))  return "location";
-  if (s2.includes("district"))                          return "district";
-  if (s2.includes("national"))                          return "nationality";
-  if (s2.includes("iswoman"))                           return "is_woman";
-  if (s2.includes("isgirl"))                            return "is_girl";
-  if (s2.includes("isyouth"))                           return "is_youth";
-  if (s2.includes("isaged"))                            return "is_aged";
-  if (s2.includes("datasource"))                        return "data_sources";
-  if (s2.includes("record") && s2.includes("status"))  return "record_status";
-  if (s2.includes("firstengagement"))                   return "first_engagement_date";
-  if (s2.includes("firstprogramme"))                    return "first_programme";
-
-  return "(ignore)";
-}
-
-// ── Required fields per table (all must be mapped before confirm) ─
-const TABLE_REQUIRED: Record<string, string[]> = {
-  person:       ["full_name"],
-  organisation: ["name"],
-  event:        ["name"],
-  attendance:   ["person_id", "event_id"],
-  pitch:        ["person_id", "event_id"],
-  diagnostic:   ["org_id"],
-  grant_capital:["funder"],
-  mel_report:   ["kpi_name"],
-  eso_partner:  ["name"],
 };
 
 const TABLE_LABELS: Record<string, string> = {
-  person:       "Person",
-  organisation: "Organisation",
-  event:        "Event",
-  attendance:   "Attendance",
-  pitch:        "Pitch",
-  diagnostic:   "Diagnostic",
-  grant_capital:"Grant / Capital",
-  mel_report:   "M&E Report",
-  eso_partner:  "ESO Partner",
+  person: "Person", organisation: "Organisation", event: "Event",
+  attendance: "Attendance", pitch: "Pitch", diagnostic: "Diagnostic",
+  eso_partner: "ESO Partner", training_session: "Training Session", mel_report: "M&E Report",
 };
 
+const REQUIRED_PER_TABLE: Record<string, string[]> = {
+  person: ["full_name"],
+  organisation: ["name"],
+  event: ["name"],
+  attendance: ["person_id", "event_id"],
+  pitch: ["event_id", "person_id"],
+  diagnostic: ["org_id"],
+  eso_partner: ["name"],
+  training_session: ["topic"],
+  mel_report: ["programme"],
+};
+
+// ── REPLACE the detectTable function in FieldMapper.tsx with this version ──
+// This adds cohort, cohort_member, and training_session detection
+
+function detectTable(cols: string[]): string {
+  const c = cols.map((x) => x.toLowerCase().replace(/[\s_\-]+/g, ""));
+  const has = (k: string) => c.some((col) => col.includes(k.toLowerCase().replace(/[\s_\-]+/g, "")));
+
+  // cohort_member: has cohort_id AND org_id AND graduated (no programme_name)
+  if (has("cohortid") && has("orgid") && has("graduated") && !has("programmename")) return "cohort_member";
+
+  // cohort: has programme_name (unique to cohort table)
+  if (has("programmename") || (has("totalstartups") && has("featureledcount"))) return "cohort";
+
+  // training_session: topic + speaker/facilitator/activity signals
+  if (has("topic") && (has("facilitator") || has("sessiontype") || has("sessiondate") || has("speakername") || has("activitytype"))) return "training_session";
+
+  // attendance: has role_at_event OR person_id+event_id+attended
+  if (has("roleat") || (has("personid") && has("eventid") && has("attended"))) return "attendance";
+
+  // diagnostic: standard fields, ILO/TA evaluations, competitiveness scorecards
+  if (
+    has("diagdate") || has("toolused") || has("lendability") || has("loanpurpose") || has("tare") ||
+    has("tabusiness") || has("tafinancial") || (has("tahr") && has("tamarketing")) ||
+    (has("overallscore") && has("strategicscore")) ||
+    (has("assessmentdate") && has("assessor"))
+  ) return "diagnostic";
+
+  // mel_report: KPI reports AND aggregate survey data
+  if (
+    has("kpiname") || has("baseline") || (has("target") && has("actual") && has("period")) ||
+    has("totalrespondents") || (has("programme") && has("year") && has("pctfemale"))
+  ) return "mel_report";
+
+  // pitch
+  if (has("winnerflag") || has("firstfemaleflag") || has("pitchstage") || has("repeatpitcher")) return "pitch";
+
+  // grant_capital
+  if (has("granttype") || has("disbursement") || has("amountusd")) return "grant_capital";
+
+  // eso_partner
+  if (has("esotype") || has("trainedbyisl") || has("activepartner")) return "eso_partner";
+
+  // event
+  if (has("eventtype") || has("editionyear") || (has("datestart") && has("venue"))) return "event";
+
+  // organisation (after diagnostic so ILO evals with is_woman_led don't mis-detect)
+  if (has("orgtype") || has("founder") || (has("womanled") && !has("tabusiness") && !has("tafinancial"))) return "organisation";
+
+  return "person";
+}
+
+function autoMap(src: string, table: string): string {
+  const s = src.toLowerCase().replace(/[^a-z0-9_]/g, "");
+  const fields = TABLE_FIELDS[table] ?? TABLE_FIELDS.person;
+  if (fields.includes(src)) return src;
+
+  if (table === "attendance") {
+    if (s === "personid" || s === "person_id") return "person_id";
+    if (s === "eventid" || s === "event_id") return "event_id";
+    if (s.includes("role")) return "role_at_event";
+    if (s.includes("register")) return "registered";
+    if (s === "attended" || s === "attend") return "attended";
+    if (s.includes("day")) return "day_number";
+    if (s.includes("source") || s.includes("form")) return "source_form";
+    if (s.includes("batch")) return "import_batch";
+    return "(ignore)";
+  }
+  if (table === "diagnostic") {
+    if (s === "orgid" || s === "org_id") return "org_id";
+    if (s === "islref" || s === "isl_ref") return "isl_ref";
+    if (s.includes("diagdate") || s === "date") return "diag_date";
+    if (s.includes("tool")) return "tool_used";
+    if (s.includes("sector")) return "sector";
+    if (s.includes("businessage") || s === "business_age") return "business_age";
+    if (s.includes("employ")) return "employees";
+    if (s.includes("revenueband") || s === "revenue_band") return "revenue_band";
+    if (s.includes("loanpurpose") || s === "loan_purpose") return "loan_purpose";
+    if (s.includes("plan")) return "has_business_plan";
+    if (s.includes("profit")) return "profitability";
+    if (s.includes("growth")) return "growth_sector";
+    if (s.includes("capacity")) return "capacity_utilisation";
+    if (s.includes("qa") || (s.includes("quality") && s.includes("sys"))) return "has_qa_system";
+    if (s.includes("sales") && s.includes("strat")) return "has_sales_strategy";
+    if (s.includes("marketreach") || s === "market_reach") return "market_reach";
+    if (s.includes("financialrec")) return "financial_records";
+    if (s.includes("mgmtacc") || s.includes("managementacc")) return "management_accounts";
+    if (s.includes("loanhistory") || s === "loan_history") return "loan_history";
+    if (s.includes("financesep")) return "finance_separation";
+    if (s.includes("hrpolicy") || s === "hr_policy") return "hr_policy";
+    if (s.includes("payroll")) return "payroll_system";
+    if (s.includes("software")) return "software_used";
+    if (s.includes("challenge")) return "main_challenge";
+    if (s.includes("tareceived") || s === "ta_received") return "ta_received";
+    if (s.includes("womanled") || s === "woman_led_flag") return "woman_led_flag";
+    if (s.includes("youthled") || s === "youth_led_flag") return "youth_led_flag";
+    if (s.includes("referral")) return "referral_source";
+    if (s.includes("lendability")) return "lendability_score";
+    if (s.includes("strategic")) return "strategic_score";
+    if (s.includes("processcore") || s === "process_score") return "process_score";
+    if (s.includes("supportscore") || s === "support_score") return "support_score";
+    if (s.includes("overall")) return "overall_score";
+    if (s.includes("tier")) return "tier";
+    if (s.includes("datasource") || s === "data_sources") return "data_sources";
+    if (s.includes("contact")) return "contact";
+    // Assessment/scorecard specific
+    if (s === "ref" || s.includes("businessref") || s.includes("assessmentref")) return "isl_ref";
+    if (s.includes("assessmentdate") || s.includes("assessdate")) return "diag_date";
+    if (s.includes("businessname") || s === "companyname") return "org_id";
+    if (s.includes("ceoname")) return "contact";
+    if (s.includes("assessor") && !s.includes("person")) return "assessor";
+    if (s.startsWith("ta") && s.length > 3 && !s.includes("target")) return "ta_received";
+    if (s.includes("iswomanled") || s === "is_woman_led") return "woman_led_flag";
+    if (s.includes("keygap") || s.includes("recommendation")) return "gap_priority";
+    if (s.includes("overallrating")) return "tier";
+    return "(ignore)";
+  }
+  if (table === "training_session") {
+    if (s === "islref" || s === "isl_ref") return "isl_ref";
+    if (s === "eventid" || s === "event_id") return "event_id";
+    if (s === "topic") return "topic";
+    if (s.includes("facilitator") || s.includes("speakername") || s === "speaker_name") return "facilitator";
+    if (s.includes("sessiondate") || s === "date") return "session_date";
+    if (s.includes("sessiontype") || s.includes("activitytype") || s === "activity_type") return "session_type";
+    if (s.includes("format")) return "format";
+    if (s.includes("duration")) return "duration_hours";
+    if (s.includes("funder")) return "programme_funder";
+    if (s.includes("totalreg") || s === "total_registered") return "total_registered";
+    if (s.includes("totalatt") || s === "total_attended") return "total_attended";
+    if (s.includes("femalecount") || s === "female_count") return "female_count";
+    if (s.includes("malecount") || s === "male_count") return "male_count";
+    if (s.includes("satisfaction")) return "satisfaction_score";
+    if (s.includes("datasource") || s === "data_sources") return "data_sources";
+    return "(ignore)";
+  }
+  if (table === "mel_report") {
+    if (s === "islref" || s === "isl_ref") return "isl_ref";
+    if (s.includes("periodstart")) return "period_start";
+    if (s.includes("periodend")) return "period_end";
+    if (s === "period") return "period";
+    if (s.includes("programme")) return "programme";
+    if (s.includes("funder")) return "funder";
+    if (s.includes("reporttype")) return "report_type";
+    if (s.includes("kpi")) return "kpi_name";
+    if (s.includes("baseline")) return "baseline";
+    if (s.includes("target")) return "target";
+    if (s.includes("actual")) return "actual";
+    if (s.includes("status")) return "status";
+    if (s.includes("female") && s.includes("ben")) return "female_beneficiaries";
+    if (s.includes("male") && s.includes("ben")) return "male_beneficiaries";
+    if (s.includes("youth") && s.includes("ben")) return "youth_beneficiaries";
+    if (s.includes("jobs") && s.includes("female")) return "jobs_created_female";
+    if (s.includes("jobs") && s.includes("male")) return "jobs_created_male";
+    if (s.includes("satisfaction")) return "satisfaction";
+    if (s.includes("prepared")) return "prepared_by";
+    if (s.includes("datasource") || s === "data_sources") return "data_sources";
+    if (s.includes("evidence")) return "data_sources";
+    if (s === "reportingperiod" || s.includes("reportingperiod")) return "period";
+    if (s === "year") return "period";
+    if (s.includes("metricref") || s.includes("surveyref")) return "isl_ref";
+    if (s === "ref") return "isl_ref";
+    return "(ignore)";
+  }
+  if (table === "event") {
+    if (s === "islref" || s === "isl_ref") return "isl_ref";
+    if (s === "name" || s.includes("eventname")) return "name";
+    if (s.includes("eventtype") || s === "event_type") return "event_type";
+    if (s.includes("programme")) return "programme";
+    if (s.includes("editionyear") || s === "edition_year") return "edition_year";
+    if (s.includes("theme")) return "theme";
+    if (s.includes("datestart") || s === "date_start") return "date_start";
+    if (s.includes("dateend") || s === "date_end") return "date_end";
+    if (s.includes("venue")) return "venue";
+    if (s.includes("funder")) return "funder";
+    if (s.includes("partner")) return "partner_organisations";
+    if (s.includes("totalreg") || s === "total_registered") return "total_registered";
+    if (s.includes("totalatt") || s === "total_attended") return "total_attended";
+    if (s.includes("femalecount") || s === "female_count") return "female_count";
+    if (s.includes("malecount") || s === "male_count") return "male_count";
+    if (s.includes("datasource") || s === "data_sources") return "data_sources";
+    return "(ignore)";
+  }
+  if (table === "organisation") {
+    if (s === "orgid" || s === "org_id") return "org_id";
+    if (s === "islref" || s === "isl_ref") return "isl_ref";
+    if (s === "name") return "name";
+    if (s.includes("sector")) return "sector";
+    if (s.includes("stage")) return "stage";
+    if (s.includes("womanled") || s === "woman_led" || s.includes("iswomanled")) return "woman_led";
+    if (s.includes("youthled") || s === "youth_led") return "youth_led";
+    if (s.includes("founder") && !s.includes("gender")) return "founder_person_id";
+    if (s.includes("location")) return "location";
+    if (s.includes("district")) return "district";
+    if (s.includes("active")) return "active";
+    if (s.includes("datasource") || s === "data_sources") return "data_sources";
+    if (s.includes("businessname")) return "name";
+    if (s.includes("businessref")) return "isl_ref";
+    if (s.includes("dateregistered")) return "founded_date";
+    if (s.includes("evaluationsummary")) return "description";
+    return "(ignore)";
+  }
+  if (table === "eso_partner") {
+    if (s === "esoid" || s === "eso_id") return "eso_id";
+    if (s === "name") return "name";
+    if (s.includes("esotype") || s === "eso_type") return "eso_type";
+    if (s.includes("country")) return "country";
+    if (s.includes("city")) return "city";
+    if (s.includes("focus")) return "focus_sectors";
+    if (s.includes("trainedbyisl") || s === "trained_by_isl") return "trained_by_isl";
+    if (s.includes("activepartner") || s === "active_partner") return "active_partner";
+    if (s.includes("datasource") || s === "data_sources") return "data_sources";
+    return "(ignore)";
+  }
+  if (table === "pitch") {
+    if (s === "islref" || s === "isl_ref") return "isl_ref";
+    if (s === "eventid" || s === "event_id") return "event_id";
+    if (s === "personid" || s === "person_id") return "person_id";
+    if (s === "orgid" || s === "org_id") return "org_id";
+    if (s.includes("category")) return "category";
+    if (s.includes("subcategory")) return "sub_category";
+    if (s.includes("idea") || s.includes("description")) return "idea_description";
+    if (s.includes("winnerflag") || s === "winner_flag") return "winner_flag";
+    if (s.includes("firstfemale") || s === "first_female_flag") return "first_female_flag";
+    if (s.includes("prizea")) return "prize_amount";
+    if (s === "score") return "score";
+    if (s === "rank") return "rank";
+    if (s.includes("notes")) return "notes";
+    if (s.includes("datasource") || s === "data_sources") return "data_sources";
+    return "(ignore)";
+  }
+  // person (default)
+  if (s === "islref" || s === "isl_ref") return "isl_ref";
+  if (s === "fullname" || s === "full_name" || s === "name") return "full_name";
+  if (s.includes("email")) return "email_primary";
+  if (s.includes("phone") || s.includes("whatsapp")) return "phone_primary";
+  if (s.includes("gender") || s.includes("sex")) return "gender";
+  if (s === "agegroup" || s === "age_group") return "age_group";
+  if (s.includes("age")) return "age_raw";
+  if (s.includes("dob") || s.includes("birth")) return "date_of_birth";
+  if (s.includes("location") || s.includes("city")) return "location";
+  if (s.includes("district")) return "district";
+  if (s.includes("national")) return "nationality";
+  if (s === "iswoman" || s === "is_woman") return "is_woman";
+  if (s === "isgirl" || s === "is_girl") return "is_girl";
+  if (s === "isyouth" || s === "is_youth") return "is_youth";
+  if (s === "isaged" || s === "is_aged") return "is_aged";
+  if (s === "ispwd" || s === "is_pwd") return "is_pwd";
+  if (s.includes("repeat")) return "is_repeat_beneficiary";
+  if (s.includes("outsidefreetown") || s === "is_outside_freetown") return "is_outside_freetown";
+  if (s.includes("firstengagement") || s === "first_engagement_date") return "first_engagement_date";
+  if (s.includes("firstprogramme") || s === "first_programme") return "first_programme";
+  if (s === "recordstatus" || s === "record_status") return "record_status";
+  if (s === "importstatus" || s === "import_status") return "import_status";
+  if (s.includes("datasource") || s === "data_sources") return "data_sources";
+  if (s.includes("speakername") || s === "speaker_name") return "full_name";
+  if (s === "ref" || s.includes("applicationref")) return "isl_ref";
+  return "(ignore)";
+}
+
 interface Props {
-  data:      Record<string, string>[];
-  onConfirm: (map: Record<string, string>, table: string) => void;
+  data: Record<string, string>[];
+  onConfirm: (map: Record<string, string>, targetTable: string) => void;
 }
 
 export function FieldMapper({ data, onConfirm }: Props) {
-  const sourceFields = useMemo(() => data.length ? Object.keys(data[0]) : [], [data]);
-
+  const sourceFields = useMemo(() => (data.length ? Object.keys(data[0]) : []), [data]);
   const detectedTable = useMemo(() => detectTable(sourceFields), [sourceFields]);
   const [targetTable, setTargetTable] = useState(detectedTable);
 
@@ -256,112 +355,99 @@ export function FieldMapper({ data, onConfirm }: Props) {
     return m;
   });
 
-  function changeTable(t: string) {
+  function handleTableChange(t: string) {
     setTargetTable(t);
     const m: Record<string, string> = {};
     for (const f of sourceFields) m[f] = autoMap(f, t);
     setMapping(m);
   }
 
-  const schemaFields = ["(ignore)", ...(TABLE_FIELDS[targetTable] ?? TABLE_FIELDS.person)];
-  const preview      = data.slice(0, 1);
-  const mappedVals   = Object.values(mapping);
-  const mappedCount  = mappedVals.filter(v => v !== "(ignore)").length;
-  const requiredFields = TABLE_REQUIRED[targetTable] ?? [];
-  const missingRequired = requiredFields.filter(r => !mappedVals.includes(r));
+  const preview = data.slice(0, 3);
+  const allFields = ["(ignore)", ...(TABLE_FIELDS[targetTable] ?? TABLE_FIELDS.person)];
+  const mappedCount = Object.values(mapping).filter((v) => v !== "(ignore)").length;
+  const requiredFields = REQUIRED_PER_TABLE[targetTable] ?? [];
+
+  function handleConfirm() {
+    const mapped = Object.values(mapping);
+    const missing = requiredFields.filter((r) => !mapped.includes(r));
+    if (missing.length > 0) {
+      toast.error(`Must map at least one field to: ${missing.join(", ")}`);
+      return;
+    }
+    onConfirm(mapping, targetTable);
+    toast.success(`Field mapping confirmed for ${TABLE_LABELS[targetTable]} table — running validation…`);
+  }
 
   return (
     <div>
       {/* Header */}
-      <div className="px-4 py-2.5 bg-[#DBEAFE] border-b border-[#93C5FD] flex items-center justify-between gap-4 flex-wrap">
+      <div className="px-4 py-2.5 bg-[#DBEAFE] border-b border-[#93C5FD] flex items-center justify-between flex-wrap gap-2">
         <p className="text-[11px] text-[#1E40AF]">
           Mapping <strong>{sourceFields.length}</strong> source columns from{" "}
           <strong>{data.length}</strong> rows → Innovation SL schema fields
         </p>
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2">
           <span className="text-[10px] text-[#1E40AF] font-medium">Target table:</span>
           <select
             value={targetTable}
-            onChange={e => changeTable(e.target.value)}
-            className="px-2 py-1 text-[10px] border border-[#93C5FD] rounded-md bg-white text-[#1E40AF] font-medium focus:outline-none focus:ring-1 focus:ring-[#2D1B69]/40"
+            onChange={(e) => handleTableChange(e.target.value)}
+            className="px-2 py-1 text-[10px] border border-[#93C5FD] rounded-md bg-white text-[#1E40AF] font-medium focus:outline-none"
           >
-            {Object.keys(TABLE_LABELS).map(t => (
+            {Object.keys(TABLE_LABELS).map((t) => (
               <option key={t} value={t}>{TABLE_LABELS[t]}</option>
             ))}
           </select>
-          <span className="text-[10px] text-[#1E40AF]">
-            {mappedCount} of {sourceFields.length} mapped
-          </span>
+          <span className="text-[10px] text-[#3B82F6]">{mappedCount} of {sourceFields.length} mapped</span>
         </div>
       </div>
 
-      {/* Auto-detection notice */}
-      <div className="px-4 py-1.5 bg-green-50 border-b border-green-200 flex items-center gap-2 flex-wrap">
-        <span className="text-[10px] text-green-700 font-medium">
-          ✓ Auto-detected: <strong>{TABLE_LABELS[targetTable]}</strong> table
-        </span>
-        <span className="text-[10px] text-green-600">
-          — wrong? Change the target table above and all fields will remap automatically.
-        </span>
-        {missingRequired.length > 0 && (
-          <span className="ml-auto text-[10px] text-amber-700 font-medium">
-            ⚠ Still needs: {missingRequired.join(", ")}
-          </span>
+      {/* Detection banner */}
+      <div className="px-4 py-1.5 bg-[#F5F2FD] border-b border-[#EDE8F8] flex items-center gap-2 flex-wrap">
+        <span className="text-[9px] font-medium text-[#7B5EA7] uppercase tracking-wide">Auto-detected:</span>
+        <span className="pill bg-[#EDE8F8] text-[#4A2FA0] text-[9px]">{TABLE_LABELS[detectedTable]} table</span>
+        {detectedTable !== targetTable && (
+          <span className="text-[9px] text-amber-600">· Overridden to {TABLE_LABELS[targetTable]}</span>
         )}
+        <span className="ml-auto text-[9px] text-[#9490a8]">
+          Required fields: <strong>{requiredFields.join(", ")}</strong>
+        </span>
       </div>
 
       {/* Mapping table */}
       <div className="overflow-x-auto max-h-[420px] overflow-y-auto">
         <table className="w-full text-[11px]">
           <thead className="sticky top-0 z-10">
-            <tr className="border-b border-border bg-muted/40">
-              <th className="px-4 py-2 text-left text-[9px] uppercase tracking-wider text-muted-foreground w-[35%]">Source column</th>
-              <th className="px-2 w-6" />
-              <th className="px-4 py-2 text-left text-[9px] uppercase tracking-wider text-muted-foreground w-[35%]">Maps to</th>
+            <tr className="border-b border-border bg-[#F5F2FD]">
+              <th className="px-4 py-2 text-left text-[9px] uppercase tracking-wider text-muted-foreground w-[30%]">Source column</th>
+              <th className="px-2 text-center text-[9px] text-muted-foreground w-6">→</th>
+              <th className="px-4 py-2 text-left text-[9px] uppercase tracking-wider text-muted-foreground w-[35%]">Maps to (schema field)</th>
               <th className="px-4 py-2 text-left text-[9px] uppercase tracking-wider text-muted-foreground">Preview (row 1)</th>
             </tr>
           </thead>
           <tbody>
             {sourceFields.map((f) => {
-              const mapped     = mapping[f] !== "(ignore)";
               const isRequired = requiredFields.includes(mapping[f]);
+              const isMapped = mapping[f] !== "(ignore)";
               return (
-                <tr
-                  key={f}
-                  className={`border-b border-border transition-colors
-                    ${mapped ? "hover:bg-[#F5F2FD]" : "bg-muted/10 hover:bg-muted/20"}`}
-                >
-                  <td className="px-4 py-1.5 text-muted-foreground font-mono text-[10px] bg-muted/10">
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                        style={{
-                          background: isRequired ? "#22C55E"
-                            : mapped    ? "#7B5EA7"
-                            : "#CBD5E1",
-                        }}
-                        title={isRequired ? "Required field" : mapped ? "Mapped" : "Ignored"}
-                      />
-                      {f}
-                    </div>
-                  </td>
+                <tr key={f} className="border-b border-border hover:bg-[#F5F2FD]">
+                  <td className="px-4 py-2 font-mono text-[10px] bg-muted/10 text-muted-foreground">{f}</td>
                   <td className="px-1 text-[#7B5EA7] font-medium text-center">→</td>
-                  <td className="px-4 py-1">
+                  <td className="px-4 py-1.5">
                     <select
                       value={mapping[f]}
                       onChange={(e) => setMapping((m) => ({ ...m, [f]: e.target.value }))}
                       className={`w-full px-2 py-1 text-[10px] border rounded-md focus:outline-none focus:ring-1 focus:ring-[#2D1B69]/40 transition-colors
-                        ${mapping[f] === "(ignore)"
-                          ? "border-border bg-white text-muted-foreground italic"
-                          : "border-[#7B5EA7] bg-[#EDE8F8] text-[#2D1B69] font-medium"}`}
+                        ${isRequired ? "border-green-400 bg-green-50 text-green-800 font-medium"
+                          : isMapped  ? "border-[#7B5EA7] bg-[#EDE8F8] text-[#2D1B69]"
+                                      : "border-border bg-white text-muted-foreground italic"}`}
                     >
-                      {schemaFields.map((sf) => (
+                      {allFields.map((sf) => (
                         <option key={sf} value={sf}>{sf}</option>
                       ))}
                     </select>
                   </td>
-                  <td className="px-4 py-1.5 text-muted-foreground text-[10px] truncate max-w-[200px]">
-                    {preview[0]?.[f] || <span className="text-muted-foreground/40 italic">empty</span>}
+                  <td className="px-4 py-2 text-muted-foreground truncate max-w-[200px] text-[10px]">
+                    {preview[0]?.[f] ?? "—"}
                   </td>
                 </tr>
               );
@@ -371,35 +457,33 @@ export function FieldMapper({ data, onConfirm }: Props) {
       </div>
 
       {/* Footer */}
-      <div className="px-4 py-3 border-t border-border flex items-center gap-3 flex-wrap">
+      <div className="px-4 py-3 border-t border-border flex items-center gap-2 flex-wrap">
         <button
-          onClick={() => {
-            const vals = Object.values(mapping);
-            const missing = (TABLE_REQUIRED[targetTable] ?? []).filter(r => !vals.includes(r));
-            if (missing.length > 0) {
-              toast.error(`Map these required fields first: ${missing.join(", ")}`);
-              return;
-            }
-            if (mappedCount === 0) {
-              toast.error("Map at least one column before confirming");
-              return;
-            }
-            onConfirm(mapping, targetTable);
-            toast.success(`Mapping confirmed for ${TABLE_LABELS[targetTable]} — running validation…`);
-          }}
+          onClick={handleConfirm}
           className="px-4 py-2 bg-[#15803D] text-white rounded-lg text-[11px] font-medium hover:bg-green-700 transition-colors"
         >
           Confirm mapping → validate
         </button>
         <button
-          onClick={() => toast.success("Template saved — will auto-apply next time you import this file type")}
+          onClick={() => {
+            const m: Record<string, string> = {};
+            for (const f of sourceFields) m[f] = autoMap(f, targetTable);
+            setMapping(m);
+            toast.success("Fields auto-mapped based on column names");
+          }}
+          className="px-4 py-2 bg-[#EDE8F8] text-[#4A2FA0] border border-[#7B5EA7] rounded-lg text-[11px] font-medium hover:bg-[#D8D0F5] transition-colors"
+        >
+          Auto-map all
+        </button>
+        <button
           className="px-4 py-2 bg-white border border-border rounded-lg text-[11px] hover:bg-muted/50 transition-colors"
+          onClick={() => toast.success("Template saved for future imports of this source")}
         >
           Save as template
         </button>
-        <span className="text-[10px] text-muted-foreground ml-auto">
-          {mappedCount} of {sourceFields.length} columns mapped ·{" "}
-          target: <strong className="text-foreground">{targetTable}</strong>
+        <span className="ml-auto text-[10px] text-muted-foreground">
+          {mappedCount} of {sourceFields.length} columns mapped · target table:{" "}
+          <strong className="text-[#2D1B69]">{targetTable}</strong>
         </span>
       </div>
     </div>

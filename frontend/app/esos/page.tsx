@@ -17,7 +17,12 @@ export default async function ESOsPage() {
       <PageHeader
         title="ESO & partner organisations"
         subtitle="All ecosystem partners, funders and trained ESOs"
-        actions={[{ label: "+ Add partner", href: "/esos/new", variant: "primary" }]}
+        actions={[
+          { label: "Export CSV",        href: "/api/esos/export",                variant: "secondary" },
+          { label: "Download template", href: "/api/esos/export?template=1",     variant: "secondary" },
+          { label: "Import CSV →",      href: "/import",                         variant: "secondary" },
+          { label: "+ Add partner",     href: "/esos/new",                       variant: "primary"   },
+        ]}
       />
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">

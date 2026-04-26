@@ -3,12 +3,24 @@ import { auth }             from "@clerk/nextjs/server";
 import { createAdminClient } from "@/lib/supabase";
 import Papa                  from "papaparse";
 
+const TEMPLATE_COLS = ["full_name","gender","age_group","nationality","phone_primary","email_primary","location","district","is_woman","is_youth","is_girl","is_aged","is_pwd","first_engagement_date","first_programme"] as const;
+
 export async function GET(req: Request) {
   const { userId } = auth();
   if (!userId) return new NextResponse("Unauthorized", { status: 401 });
 
-  const url    = new URL(req.url);
-  const isWoman = url.searchParams.get("is_woman") === "true";
+  const url        = new URL(req.url);
+  const isWoman    = url.searchParams.get("is_woman") === "true";
+  const isTemplate = url.searchParams.get("template") === "1";
+
+  if (isTemplate) {
+    return new NextResponse(Papa.unparse({ fields: [...TEMPLATE_COLS], data: [] }), {
+      headers: {
+        "Content-Type":        "text/csv",
+        "Content-Disposition": `attachment; filename="template-people.csv"`,
+      },
+    });
+  }
 
   const supabase = createAdminClient();
   let query = supabase
@@ -22,9 +34,7 @@ export async function GET(req: Request) {
   const { data, error } = await query;
   if (error) return new NextResponse("Database error", { status: 500 });
 
-  const csv = Papa.unparse(data ?? []);
-
-  return new NextResponse(csv, {
+  return new NextResponse(Papa.unparse(data ?? []), {
     headers: {
       "Content-Type":        "text/csv",
       "Content-Disposition": `attachment; filename="innovationsl-people-${Date.now()}.csv"`,

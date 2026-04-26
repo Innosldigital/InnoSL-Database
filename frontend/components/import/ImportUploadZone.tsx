@@ -6,7 +6,7 @@ import * as XLSX                 from "xlsx";
 import { toast }                 from "sonner";
 
 interface Props {
-  onUploaded: (data: Record<string, string>[], batch: string, stagingId: string) => void;
+  onUploaded: (data: Record<string, string>[], batch: string, stagingId?: string) => void;
 }
 
 export function ImportUploadZone({ onUploaded }: Props) {

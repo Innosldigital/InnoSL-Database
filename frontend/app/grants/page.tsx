@@ -20,8 +20,10 @@ export default async function GrantsPage({ searchParams }: Props) {
         title="Grants & capital"
         subtitle="All disbursements · prizes · seed capital · 2018-2026"
         actions={[
-          { label: "Export CSV", href: "/api/grants/export", variant: "secondary" },
-          { label: "+ Add grant", href: "/grants/new", variant: "primary" },
+          { label: "Export CSV",        href: "/api/grants/export",              variant: "secondary" },
+          { label: "Download template", href: "/api/grants/export?template=1",   variant: "secondary" },
+          { label: "Import CSV →",      href: "/import",                         variant: "secondary" },
+          { label: "+ Add grant",       href: "/grants/new",                     variant: "primary"   },
         ]}
       />
       <GrantsSummary summary={summary} />

@@ -20,7 +20,12 @@ export default async function TrainingPage() {
       <PageHeader
         title="Training & workshops"
         subtitle="All sessions - facilitators - cohorts - 2018-2026"
-        actions={[{ label: "+ Add session", href: "/training/new", variant: "primary" }]}
+        actions={[
+          { label: "Export CSV",        href: "/api/training/export",            variant: "secondary" },
+          { label: "Download template", href: "/api/training/export?template=1", variant: "secondary" },
+          { label: "Import CSV →",      href: "/import",                         variant: "secondary" },
+          { label: "+ Add session",     href: "/training/new",                   variant: "primary"   },
+        ]}
       />
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">

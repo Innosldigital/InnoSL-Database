@@ -17,7 +17,12 @@ export default async function VIPsPage() {
       <PageHeader
         title="VIP contacts"
         subtitle="Investors - diplomats - government - media - development partners"
-        actions={[{ label: "+ Add VIP contact", href: "/vips/new", variant: "primary" }]}
+        actions={[
+          { label: "Export CSV",        href: "/api/vips/export",                variant: "secondary" },
+          { label: "Download template", href: "/api/vips/export?template=1",     variant: "secondary" },
+          { label: "Import CSV →",      href: "/import",                         variant: "secondary" },
+          { label: "+ Add VIP contact", href: "/vips/new",                       variant: "primary"   },
+        ]}
       />
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">

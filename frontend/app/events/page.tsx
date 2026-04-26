@@ -27,8 +27,10 @@ export default async function EventsPage({ searchParams }: Props) {
         title="Events & attendance"
         subtitle="Every event, registration and attendance record - 2018-2026"
         actions={[
-          { label: "Export CSV", href: "/api/events/export", variant: "secondary" },
-          { label: "+ Add event", href: "/events/new", variant: "primary" },
+          { label: "Export CSV",        href: "/api/events/export",              variant: "secondary" },
+          { label: "Download template", href: "/api/events/export?template=1",   variant: "secondary" },
+          { label: "Import CSV →",      href: "/import",                         variant: "secondary" },
+          { label: "+ Add event",       href: "/events/new",                     variant: "primary"   },
         ]}
       />
       <Suspense fallback={null}><EventsStats /></Suspense>

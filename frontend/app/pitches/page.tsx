@@ -22,8 +22,10 @@ export default async function PitchesPage({ searchParams }: Props) {
         title="Pitch competitions"
         subtitle="FPN · OSVP · EWC · GEW pitch tracks · 2018-2026"
         actions={[
-          { label: "Export CSV", href: "/api/pitches/export", variant: "secondary" },
-          { label: "+ Add pitch", href: "/pitches/new", variant: "primary" },
+          { label: "Export CSV",        href: "/api/pitches/export",             variant: "secondary" },
+          { label: "Download template", href: "/api/pitches/export?template=1",  variant: "secondary" },
+          { label: "Import CSV →",      href: "/import",                         variant: "secondary" },
+          { label: "+ Add pitch",       href: "/pitches/new",                    variant: "primary"   },
         ]}
       />
       <Suspense fallback={null}><FirstFemaleWidget /></Suspense>

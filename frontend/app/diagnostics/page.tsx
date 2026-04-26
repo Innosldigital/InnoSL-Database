@@ -15,8 +15,10 @@ export default async function DiagnosticsPage() {
         title="Business diagnostics"
         subtitle="SME assessments · ILO scorecards · ISL lendability index · 2018-2026"
         actions={[
-          { label: "Export CSV", href: "/api/diagnostics/export", variant: "secondary" },
-          { label: "+ New diagnostic", href: "/diagnostics/new", variant: "primary" },
+          { label: "Export CSV",        href: "/api/diagnostics/export",             variant: "secondary" },
+          { label: "Download template", href: "/api/diagnostics/export?template=1",  variant: "secondary" },
+          { label: "Import CSV →",      href: "/import",                              variant: "secondary" },
+          { label: "+ New diagnostic",  href: "/diagnostics/new",                    variant: "primary"   },
         ]}
       />
       <Suspense fallback={<div className="h-10 animate-pulse rounded-xl bg-white/50" />}>

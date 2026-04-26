@@ -5,11 +5,11 @@ import { cleanRowForTable } from "@/lib/cleaning-engine";
 import { getScoreColour } from "@/lib/utils";
 
 interface Props {
-  batchId:     string;
-  stagingId:   string;
-  fieldMap:    Record<string, string>;
-  data:        Record<string, string>[];
-  targetTable: string;
+  batchId:      string;
+  stagingId?:   string;
+  fieldMap:     Record<string, string>;
+  data:         Record<string, string>[];
+  targetTable:  string;
 }
 
 export function ApprovalPanel({ batchId, stagingId, fieldMap, data, targetTable }: Props) {

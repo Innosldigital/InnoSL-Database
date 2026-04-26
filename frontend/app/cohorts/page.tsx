@@ -18,7 +18,12 @@ export default async function CohortsPage() {
       <PageHeader
         title="Incubation & acceleration"
         subtitle="All cohort members and programme outcomes - 2018-2026"
-        actions={[{ label: "+ Add cohort", href: "/cohorts/new", variant: "primary" }]}
+        actions={[
+          { label: "Export CSV",        href: "/api/cohorts/export",             variant: "secondary" },
+          { label: "Download template", href: "/api/cohorts/export?template=1",  variant: "secondary" },
+          { label: "Import CSV →",      href: "/import",                         variant: "secondary" },
+          { label: "+ Add cohort",      href: "/cohorts/new",                    variant: "primary"   },
+        ]}
       />
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">

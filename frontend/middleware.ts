@@ -5,6 +5,7 @@ const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/api/public/(.*)",
+  "/api/db-health",       // internal diagnostics — no PII exposed
   "/impact(.*)",          // public-facing impact stats page
 ]);
 
