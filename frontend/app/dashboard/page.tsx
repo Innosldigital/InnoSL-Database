@@ -57,6 +57,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           equity={kpis.equity}
           eventsCount={kpis.events_count}
           totalUSD={kpis.total_usd}
+          jobsCreated={kpis.jobs_created}
           activeYear={year}
           activeProgramme={programme && programme !== "All" ? programme : undefined}
         />

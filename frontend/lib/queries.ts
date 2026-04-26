@@ -342,19 +342,20 @@ export async function getBeneficiariesByYear(): Promise<BeneficiaryByYear[]> {
 
 export async function getSectorBreakdown() {
   const supabase = createAdminClient();
+  // Include all orgs (active + stub/inactive) so pitch-imported companies count
   const { data, error } = await supabase
     .from("organisation")
     .select("sector")
-    .eq("active", true);
+    .not("sector", "is", null);
   if (error) throw error;
   const counts: Record<string, number> = {};
   for (const row of data ?? []) {
-    const s = row.sector ?? "Other";
+    const s = (row.sector as string).trim() || "Other";
     counts[s] = (counts[s] ?? 0) + 1;
   }
   return Object.entries(counts)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 5)
+    .slice(0, 7)
     .map(([sector, count]) => ({ sector, count }));
 }
 
@@ -478,13 +479,13 @@ async function computeFilteredSectors(
   }
 
   if (!orgIds.length) return [];
-  const { data: orgs } = await supabase.from("organisation").select("sector").in("org_id", orgIds);
+  const { data: orgs } = await supabase.from("organisation").select("sector").in("org_id", orgIds).not("sector", "is", null);
   const counts: Record<string, number> = {};
   for (const row of orgs ?? []) {
-    const s = (row as any).sector ?? "Other";
+    const s = ((row as any).sector as string).trim() || "Other";
     counts[s] = (counts[s] ?? 0) + 1;
   }
-  return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([sector, count]) => ({ sector, count }));
+  return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 7).map(([sector, count]) => ({ sector, count }));
 }
 
 // Compute capital summary filtered by year and/or programme
@@ -542,8 +543,17 @@ export async function getDashboardKPIs(filters: { year?: number; programme?: str
   if (year) eventsQ = eventsQ.eq("edition_year", year);
   if (eventType) eventsQ = eventsQ.eq("event_type", eventType);
 
-  const [equity, byYear, capital, sectors, monthly, eventsRes] = await Promise.all([
-    equityPromise, byYearPromise, capitalPromise, sectorsPromise, monthlyPromise, eventsQ,
+  // Jobs created — sum from cohort table, respect year filter
+  const jobsPromise = (async () => {
+    let q = supabase.from("cohort").select("jobs_created");
+    if (year) q = q.eq("year", year);
+    if (programme && programme !== "All") q = (q as any).ilike("programme_name", `%${programme}%`);
+    const { data } = await q;
+    return (data ?? []).reduce((s: number, r: any) => s + (Number(r.jobs_created) || 0), 0);
+  })().catch(() => 0);
+
+  const [equity, byYear, capital, sectors, monthly, eventsRes, jobsCreated] = await Promise.all([
+    equityPromise, byYearPromise, capitalPromise, sectorsPromise, monthlyPromise, eventsQ, jobsPromise,
   ]);
 
   const totalUSD          = capital.reduce((acc, r) => acc + (r.total_usd    ?? 0), 0);
@@ -563,6 +573,7 @@ export async function getDashboardKPIs(filters: { year?: number; programme?: str
     equity, byYear, capital, sectors, monthly,
     events_count:         eventsRes.count ?? 0,
     total_usd:            totalUSD,
+    jobs_created:         jobsCreated,
     capital_to_women_pct: capitalToWomenPct,
     women_led_pct:        womenLedPct,
   };
