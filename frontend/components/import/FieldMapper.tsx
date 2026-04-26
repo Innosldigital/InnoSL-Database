@@ -186,24 +186,24 @@ function autoMap(src: string, table: string): string {
     if (s.includes("datasource") || s === "data_sources") return "data_sources";
     if (s.includes("contact")) return "contact";
     // Assessment/scorecard specific
-    if (s === "ref" || s.includes("businessref") || s.includes("assessmentref")) return "isl_ref";
-    if (s.includes("assessmentdate") || s.includes("assessdate")) return "diag_date";
-    if (s.includes("businessname") || s === "companyname") return "org_id";
-    if (s.includes("ceoname")) return "contact";
+    if (s === "ref" || s === "business_ref" || s === "assessment_ref" || s.includes("businessref") || s.includes("assessmentref")) return "isl_ref";
+    if (s === "assessment_date" || s.includes("assessmentdate") || s.includes("assessdate")) return "diag_date";
+    if (s === "business_name" || s.includes("businessname") || s === "company_name") return "org_id";
+    if (s === "ceo_name" || s.includes("ceoname")) return "contact";
     if (s.includes("assessor") && !s.includes("person")) return "assessor";
-    if (s.startsWith("ta") && s.length > 3 && !s.includes("target")) return "ta_received";
-    if (s.includes("iswomanled") || s === "is_woman_led") return "woman_led_flag";
-    if (s.includes("keygap") || s.includes("recommendation")) return "gap_priority";
-    if (s.includes("overallrating")) return "tier";
+    if ((s.startsWith("ta_") || s.startsWith("ta")) && s.length > 3 && !s.includes("target")) return "ta_received";
+    if (s === "is_woman_led" || s.includes("iswomanled")) return "woman_led_flag";
+    if (s === "key_gaps" || s.includes("keygap") || s.includes("recommendation")) return "gap_priority";
+    if (s === "overall_rating" || s.includes("overallrating")) return "tier";
     return "(ignore)";
   }
   if (table === "training_session") {
     if (s === "islref" || s === "isl_ref") return "isl_ref";
     if (s === "eventid" || s === "event_id") return "event_id";
     if (s === "topic") return "topic";
-    if (s.includes("facilitator") || s.includes("speakername") || s === "speaker_name") return "facilitator";
-    if (s.includes("sessiondate") || s === "date") return "session_date";
-    if (s.includes("sessiontype") || s.includes("activitytype") || s === "activity_type") return "session_type";
+    if (s.includes("facilitator") || s === "speaker_name" || s.includes("speakername")) return "facilitator";
+    if (s === "session_date" || s.includes("sessiondate") || s === "date") return "session_date";
+    if (s === "session_type" || s === "activity_type" || s.includes("sessiontype") || s.includes("activitytype")) return "session_type";
     if (s.includes("format")) return "format";
     if (s.includes("duration")) return "duration_hours";
     if (s.includes("funder")) return "programme_funder";
@@ -237,9 +237,9 @@ function autoMap(src: string, table: string): string {
     if (s.includes("prepared")) return "prepared_by";
     if (s.includes("datasource") || s === "data_sources") return "data_sources";
     if (s.includes("evidence")) return "data_sources";
-    if (s === "reportingperiod" || s.includes("reportingperiod")) return "period";
+    if (s === "reporting_period" || s.includes("reportingperiod")) return "period";
     if (s === "year") return "period";
-    if (s.includes("metricref") || s.includes("surveyref")) return "isl_ref";
+    if (s === "metric_ref" || s === "survey_ref" || s.includes("metricref") || s.includes("surveyref")) return "isl_ref";
     if (s === "ref") return "isl_ref";
     return "(ignore)";
   }
@@ -268,17 +268,17 @@ function autoMap(src: string, table: string): string {
     if (s === "name") return "name";
     if (s.includes("sector")) return "sector";
     if (s.includes("stage")) return "stage";
-    if (s.includes("womanled") || s === "woman_led" || s.includes("iswomanled")) return "woman_led";
+    if (s === "woman_led" || s === "is_woman_led" || s.includes("womanled") || s.includes("iswomanled")) return "woman_led";
     if (s.includes("youthled") || s === "youth_led") return "youth_led";
     if (s.includes("founder") && !s.includes("gender")) return "founder_person_id";
     if (s.includes("location")) return "location";
     if (s.includes("district")) return "district";
     if (s.includes("active")) return "active";
     if (s.includes("datasource") || s === "data_sources") return "data_sources";
-    if (s.includes("businessname")) return "name";
-    if (s.includes("businessref")) return "isl_ref";
-    if (s.includes("dateregistered")) return "founded_date";
-    if (s.includes("evaluationsummary")) return "description";
+    if (s === "business_name" || s.includes("businessname")) return "name";
+    if (s === "business_ref" || s.includes("businessref")) return "isl_ref";
+    if (s === "date_registered" || s.includes("dateregistered")) return "founded_date";
+    if (s === "evaluation_summary" || s.includes("evaluationsummary")) return "description";
     return "(ignore)";
   }
   if (table === "eso_partner") {
@@ -334,8 +334,8 @@ function autoMap(src: string, table: string): string {
   if (s === "recordstatus" || s === "record_status") return "record_status";
   if (s === "importstatus" || s === "import_status") return "import_status";
   if (s.includes("datasource") || s === "data_sources") return "data_sources";
-  if (s.includes("speakername") || s === "speaker_name") return "full_name";
-  if (s === "ref" || s.includes("applicationref")) return "isl_ref";
+  if (s === "speaker_name" || s.includes("speakername")) return "full_name";
+  if (s === "ref" || s === "application_ref" || s.includes("applicationref")) return "isl_ref";
   return "(ignore)";
 }
 
