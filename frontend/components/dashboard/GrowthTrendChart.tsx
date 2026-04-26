@@ -10,15 +10,18 @@ const CAPITAL_BY_YEAR: Record<number, number> = {
   2022: 37, 2023: 67, 2024: 91, 2025: 115, 2026: 80,
 };
 
-interface Props { data: BeneficiaryByYear[]; }
+interface Props { data: BeneficiaryByYear[]; activeYear?: number; }
 
-export function GrowthTrendChart({ data }: Props) {
+export function GrowthTrendChart({ data, activeYear }: Props) {
   const chartData = data.map((d) => ({ ...d, capital: CAPITAL_BY_YEAR[d.year] ?? null }));
+  const title = activeYear
+    ? `9-year growth trend — ${activeYear} selected`
+    : "Beneficiary growth trend — 9-year overview (2018–2026)";
 
   return (
     <div className="isl-card">
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-        <p className="text-[12px] font-medium">Beneficiary growth trend — 9-year overview (2018–2026)</p>
+        <p className="text-[12px] font-medium">{title}</p>
         <a href="/reports" className="text-[10px] text-[#1E40AF] hover:underline">Full analysis →</a>
       </div>
       <div className="px-4 py-3">

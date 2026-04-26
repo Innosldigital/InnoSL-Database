@@ -11,7 +11,6 @@ function ChartSkeleton({ h = "h-56" }: { h?: string }) {
   return <div className={`${h} animate-pulse rounded-xl bg-white/60`} />;
 }
 
-// Recharts uses useLayoutEffect internally — load client-only to avoid hydration mismatch
 const BeneficiaryChart     = dynamic(() => import("@/components/dashboard/BeneficiaryChart").then(m => ({ default: m.BeneficiaryChart })), { ssr: false, loading: () => <ChartSkeleton /> });
 const MonthlyActivityChart = dynamic(() => import("@/components/dashboard/MonthlyActivityChart").then(m => ({ default: m.MonthlyActivityChart })), { ssr: false, loading: () => <ChartSkeleton /> });
 const CapitalChart         = dynamic(() => import("@/components/dashboard/CapitalChart").then(m => ({ default: m.CapitalChart })), { ssr: false, loading: () => <ChartSkeleton /> });
@@ -22,19 +21,27 @@ const GrowthTrendChart     = dynamic(() => import("@/components/dashboard/Growth
 export const metadata = { title: "Analytics Dashboard" };
 
 interface DashboardPageProps {
-  searchParams?: { year?: string };
+  searchParams?: { year?: string; programme?: string };
 }
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
-  const kpis = await getDashboardKPIs();
-  const selectedYear = searchParams?.year ? Number(searchParams.year) : undefined;
-  const year = Number.isFinite(selectedYear) ? selectedYear! : new Date().getFullYear();
+  const year      = searchParams?.year      ? Number(searchParams.year) : undefined;
+  const programme = searchParams?.programme ?? undefined;
+
+  const kpis = await getDashboardKPIs({ year, programme });
+
+  const activeYear        = year ?? new Date().getFullYear();
+  const isFiltered        = !!year || (!!programme && programme !== "All");
+  const filterLabel       = [year, programme && programme !== "All" ? programme : null].filter(Boolean).join(" · ");
+  const subtitleText      = isFiltered
+    ? `Filtered: ${filterLabel} · Innovation SL Ecosystem Intelligence`
+    : "Innovation SL · 2018-2026 · all programmes · real-time";
 
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
         title="Analytics dashboard"
-        subtitle="Innovation SL · 2018-2026 · all programmes · real-time"
+        subtitle={subtitleText}
         actions={[
           { label: "Export PDF ↗", href: "/api/reports/pdf", variant: "secondary" },
           { label: "Donor report ↗", href: "/reports", variant: "primary" },
@@ -46,15 +53,21 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       </Suspense>
 
       <Suspense fallback={<div className="h-24 animate-pulse rounded-xl bg-white/50" />}>
-        <KPIGrid equity={kpis.equity} eventsCount={kpis.events_count} totalUSD={kpis.total_usd} />
+        <KPIGrid
+          equity={kpis.equity}
+          eventsCount={kpis.events_count}
+          totalUSD={kpis.total_usd}
+          activeYear={year}
+          activeProgramme={programme && programme !== "All" ? programme : undefined}
+        />
       </Suspense>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Suspense fallback={<ChartSkeleton />}>
-          <BeneficiaryChart data={kpis.byYear} />
+          <BeneficiaryChart data={kpis.byYear} activeYear={year} />
         </Suspense>
         <Suspense fallback={<ChartSkeleton />}>
-          <MonthlyActivityChart data={kpis.monthly} year={year} />
+          <MonthlyActivityChart data={kpis.monthly} year={activeYear} programme={programme && programme !== "All" ? programme : undefined} />
         </Suspense>
       </div>
 
@@ -84,7 +97,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       </div>
 
       <Suspense fallback={<ChartSkeleton h="h-36" />}>
-        <GrowthTrendChart data={kpis.byYear} />
+        <GrowthTrendChart data={kpis.byYear} activeYear={year} />
       </Suspense>
     </div>
   );

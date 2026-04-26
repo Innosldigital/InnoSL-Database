@@ -7,21 +7,26 @@ import {
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
 interface Props {
-  data: { events: number[]; participants: number[] };
-  year: number;
+  data:        { events: number[]; participants: number[] };
+  year:        number;
+  programme?:  string;
 }
 
-export function MonthlyActivityChart({ data, year }: Props) {
+export function MonthlyActivityChart({ data, year, programme }: Props) {
   const chartData = MONTHS.map((month, i) => ({
     month,
     events:       data.events[i],
     participants: data.participants[i],
   }));
 
+  const title = programme
+    ? `Programme activity — ${programme} ${year}`
+    : `Programme activity — monthly ${year}`;
+
   return (
     <div className="isl-card">
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-        <p className="text-[12px] font-medium">Programme activity — monthly {year}</p>
+        <p className="text-[12px] font-medium">{title}</p>
         <a href="/events" className="text-[10px] text-[#1E40AF] hover:underline">Full calendar →</a>
       </div>
       <div className="px-4 py-3">

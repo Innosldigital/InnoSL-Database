@@ -186,7 +186,7 @@ export async function getPitchById(pitch_id: string) {
 //  GRANTS & CAPITAL
 // ============================================================
 
-export async function getGrants(filters: { funder?: string; year?: number } = {}) {
+export async function getGrants(filters: { funder?: string; year?: number; programme?: string } = {}) {
   const supabase = createAdminClient();
   let query = supabase
     .from("grant_capital")
@@ -198,6 +198,8 @@ export async function getGrants(filters: { funder?: string; year?: number } = {}
     .order("disbursement_date", { ascending: false });
 
   if (filters.funder) query = query.ilike("funder", `%${filters.funder}%`);
+  if (filters.programme && filters.programme !== "All")
+    query = (query as any).ilike("programme", `%${filters.programme}%`);
   if (filters.year) {
     query = query
       .gte("disbursement_date", `${filters.year}-01-01`)
@@ -220,12 +222,15 @@ export async function getCapitalSummary() {
 //  DIAGNOSTICS
 // ============================================================
 
-export async function getDiagnostics() {
+export async function getDiagnostics(filters: { year?: number } = {}) {
   const supabase = createAdminClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("diagnostic")
     .select(`*, organisation!left(name, sector, woman_led)`)
     .order("diag_date", { ascending: false });
+  if (filters.year)
+    query = query.gte("diag_date", `${filters.year}-01-01`).lt("diag_date", `${filters.year + 1}-01-01`);
+  const { data, error } = await query;
   if (error) throw error;
   return data as Diagnostic[];
 }
@@ -249,30 +254,33 @@ export async function getDiagnosticById(diag_id: string) {
 //  COHORTS / TRAINING / ESOS / VIPS
 // ============================================================
 
-export async function getCohorts() {
+export async function getCohorts(filters: { year?: number; programme?: string } = {}) {
   const supabase = createAdminClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("cohort")
-    .select(`
-      *,
-      cohort_member(count)
-    `)
+    .select(`*, cohort_member(count)`)
     .order("year", { ascending: false, nullsFirst: false })
     .order("cohort_number", { ascending: false, nullsFirst: false });
+  if (filters.year) query = query.eq("year", filters.year);
+  if (filters.programme && filters.programme !== "All")
+    query = (query as any).ilike("programme_name", `%${filters.programme}%`);
+  const { data, error } = await query;
   if (error) throw error;
   return (data ?? []) as Cohort[];
 }
 
-export async function getTrainingSessions() {
+export async function getTrainingSessions(filters: { year?: number; programme?: string } = {}) {
   const supabase = createAdminClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("training_session")
-    .select(`
-      *,
-      event!left(name, event_type, edition_year)
-    `)
+    .select(`*, event!left(name, event_type, edition_year)`)
     .order("session_date", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false });
+  if (filters.year)
+    query = query.gte("session_date", `${filters.year}-01-01`).lt("session_date", `${filters.year + 1}-01-01`);
+  if (filters.programme && filters.programme !== "All")
+    query = (query as any).ilike("programme_funder", `%${filters.programme}%`);
+  const { data, error } = await query;
   if (error) throw error;
   return (data ?? []) as TrainingSession[];
 }
@@ -305,6 +313,12 @@ export async function getVipContacts() {
 // ============================================================
 //  DASHBOARD — ANALYTICS VIEWS
 // ============================================================
+
+// Maps YearFilter programme names to event_type enum values
+const EVENT_TYPE_MAP: Record<string, string> = {
+  FPN: "FPN", FIW: "FIW", GEW: "GEW", OSVP: "OSVP",
+  Dare2Aspire: "Dare2Aspire", SLEDP: "SLEDP", EWC: "EWC", NYEFF: "NYEFF",
+};
 
 export async function getEquityDashboard(): Promise<EquityDashboard> {
   const supabase = createAdminClient();
@@ -344,13 +358,15 @@ export async function getSectorBreakdown() {
     .map(([sector, count]) => ({ sector, count }));
 }
 
-export async function getMonthlyActivity(year: number) {
+export async function getMonthlyActivity(year: number, eventType?: string) {
   const supabase = createAdminClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("event")
     .select("date_start, total_attended")
     .eq("edition_year", year)
     .not("date_start", "is", null);
+  if (eventType) query = query.eq("event_type", eventType);
+  const { data, error } = await query;
   if (error) throw error;
   const events       = Array(12).fill(0);
   const participants = Array(12).fill(0);
@@ -368,37 +384,183 @@ const EQUITY_ZERO: EquityDashboard = {
   regional_beneficiaries: 0, repeat_beneficiaries: 0, pct_female: 0,
 };
 
-export async function getDashboardKPIs() {
+// Compute equity stats filtered by year and/or programme
+async function computeFilteredEquity(
+  supabase: ReturnType<typeof createAdminClient>,
+  year?: number, programme?: string
+): Promise<EquityDashboard> {
+  // Incubation: measure through cohort member orgs
+  if (programme === "Incubation") {
+    let q = supabase.from("cohort").select("cohort_id");
+    if (year) q = q.eq("year", year);
+    const { data: cohorts } = await q;
+    const cIds = (cohorts ?? []).map((c: any) => c.cohort_id);
+    if (!cIds.length) return EQUITY_ZERO;
+    const { data: members } = await supabase.from("cohort_member").select("org_id").in("cohort_id", cIds);
+    const oIds = [...new Set((members ?? []).map((m: any) => m.org_id))];
+    if (!oIds.length) return EQUITY_ZERO;
+    const { data: orgs } = await supabase.from("organisation").select("org_id,woman_led,youth_led").in("org_id", oIds);
+    const total  = orgs?.length ?? 0;
+    const female = (orgs ?? []).filter((o: any) => o.woman_led).length;
+    const youth  = (orgs ?? []).filter((o: any) => o.youth_led).length;
+    return { ...EQUITY_ZERO, total_beneficiaries: total, female_beneficiaries: female, youth_beneficiaries: youth,
+      pct_female: total > 0 ? Math.round(female / total * 100) : 0 };
+  }
+
+  // Training: sum attendance counts from training_session
+  if (programme === "Training") {
+    let q = supabase.from("training_session").select("total_attended,female_count,youth_count");
+    if (year) q = q.gte("session_date", `${year}-01-01`).lt("session_date", `${year + 1}-01-01`);
+    const { data: sessions } = await q;
+    if (!sessions?.length) return EQUITY_ZERO;
+    const total  = sessions.reduce((s: number, r: any) => s + (r.total_attended ?? 0), 0);
+    const female = sessions.reduce((s: number, r: any) => s + (r.female_count   ?? 0), 0);
+    const youth  = sessions.reduce((s: number, r: any) => s + (r.youth_count    ?? 0), 0);
+    return { ...EQUITY_ZERO, total_beneficiaries: total, female_beneficiaries: female, youth_beneficiaries: youth,
+      pct_female: total > 0 ? Math.round(female / total * 100) : 0 };
+  }
+
+  // Event-based or year-only: resolve through attendance → person
+  const eventType = programme && programme !== "All" ? EVENT_TYPE_MAP[programme] : undefined;
+  let evQ = supabase.from("event").select("event_id");
+  if (year) evQ = evQ.eq("edition_year", year);
+  if (eventType) evQ = evQ.eq("event_type", eventType);
+  const { data: events } = await evQ;
+  const eventIds = (events ?? []).map((e: any) => e.event_id);
+  if (!eventIds.length) return EQUITY_ZERO;
+
+  const { data: atts } = await supabase.from("attendance").select("person_id").in("event_id", eventIds);
+  const personIds = [...new Set((atts ?? []).map((a: any) => a.person_id))];
+  if (!personIds.length) return EQUITY_ZERO;
+
+  const { data: people } = await supabase
+    .from("person")
+    .select("person_id,is_woman,is_youth,is_pwd,is_aged,is_repeat_beneficiary")
+    .in("person_id", personIds);
+  const total  = people?.length ?? 0;
+  const female = (people ?? []).filter((p: any) => p.is_woman).length;
+  const youth  = (people ?? []).filter((p: any) => p.is_youth).length;
+  const aged   = (people ?? []).filter((p: any) => p.is_aged).length;
+  const pwd    = (people ?? []).filter((p: any) => p.is_pwd).length;
+  const repeat = (people ?? []).filter((p: any) => p.is_repeat_beneficiary).length;
+  return { ...EQUITY_ZERO, total_beneficiaries: total, female_beneficiaries: female,
+    youth_beneficiaries: youth, aged_beneficiaries: aged, pwd_beneficiaries: pwd,
+    repeat_beneficiaries: repeat, pct_female: total > 0 ? Math.round(female / total * 100) : 0 };
+}
+
+// Compute sector breakdown filtered by year and/or programme
+async function computeFilteredSectors(
+  supabase: ReturnType<typeof createAdminClient>,
+  year?: number, programme?: string
+): Promise<{ sector: string; count: number }[]> {
+  const eventType = programme && programme !== "All" ? EVENT_TYPE_MAP[programme] : undefined;
+  let orgIds: string[] = [];
+
+  if (programme === "Incubation") {
+    let q = supabase.from("cohort").select("cohort_id");
+    if (year) q = q.eq("year", year);
+    const { data: cohorts } = await q;
+    const cIds = (cohorts ?? []).map((c: any) => c.cohort_id);
+    if (cIds.length) {
+      const { data: members } = await supabase.from("cohort_member").select("org_id").in("cohort_id", cIds);
+      orgIds = [...new Set((members ?? []).map((m: any) => m.org_id))];
+    }
+  } else {
+    let evQ = supabase.from("event").select("event_id");
+    if (year) evQ = evQ.eq("edition_year", year);
+    if (eventType) evQ = evQ.eq("event_type", eventType);
+    const { data: events } = await evQ;
+    const eIds = (events ?? []).map((e: any) => e.event_id);
+    if (eIds.length) {
+      const { data: pitches } = await supabase.from("pitch").select("org_id").in("event_id", eIds).not("org_id", "is", null);
+      orgIds = [...new Set((pitches ?? []).map((p: any) => p.org_id as string).filter(Boolean))];
+    }
+  }
+
+  if (!orgIds.length) return [];
+  const { data: orgs } = await supabase.from("organisation").select("sector").in("org_id", orgIds);
+  const counts: Record<string, number> = {};
+  for (const row of orgs ?? []) {
+    const s = (row as any).sector ?? "Other";
+    counts[s] = (counts[s] ?? 0) + 1;
+  }
+  return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([sector, count]) => ({ sector, count }));
+}
+
+// Compute capital summary filtered by year and/or programme
+async function computeFilteredCapital(
+  supabase: ReturnType<typeof createAdminClient>,
+  year?: number, programme?: string
+): Promise<CapitalSummary[]> {
+  let q = supabase.from("grant_capital").select("funder,grant_type,amount_usd,recipient_gender,woman_led_business");
+  if (year) q = q.gte("disbursement_date", `${year}-01-01`).lt("disbursement_date", `${year + 1}-01-01`);
+  if (programme && programme !== "All") q = (q as any).ilike("programme", `%${programme}%`);
+  const { data: grants } = await q;
+  const grouped: Record<string, { total_usd: number; usd_to_women: number; count: number; grant_type: string }> = {};
+  for (const g of grants ?? []) {
+    const f = (g as any).funder ?? "Unknown";
+    if (!grouped[f]) grouped[f] = { total_usd: 0, usd_to_women: 0, count: 0, grant_type: (g as any).grant_type ?? "Grant" };
+    grouped[f].total_usd += Number((g as any).amount_usd) || 0;
+    grouped[f].count++;
+    if ((g as any).recipient_gender === "Female" || (g as any).woman_led_business === true)
+      grouped[f].usd_to_women += Number((g as any).amount_usd) || 0;
+  }
+  return Object.entries(grouped).map(([funder, v]) => ({
+    funder, grant_type: v.grant_type, disbursements: v.count,
+    total_usd: v.total_usd, to_women_led: 0, usd_to_women: v.usd_to_women,
+  }));
+}
+
+export async function getDashboardKPIs(filters: { year?: number; programme?: string } = {}) {
   const supabase = createAdminClient();
-  const year = new Date().getFullYear();
+  const { year, programme } = filters;
+  const eventType  = programme && programme !== "All" ? EVENT_TYPE_MAP[programme] : undefined;
+  const isFiltered = !!year || (!!programme && programme !== "All");
+  const activeYear = year ?? new Date().getFullYear();
 
-  const [equity, byYear, capital, sectors, monthly] = await Promise.all([
-    getEquityDashboard().catch(() => EQUITY_ZERO),
-    getBeneficiariesByYear().catch(() => [] as BeneficiaryByYear[]),
-    getCapitalSummary().catch(() => [] as CapitalSummary[]),
-    getSectorBreakdown().catch(() => [] as { sector: string; count: number }[]),
-    getMonthlyActivity(year).catch(() => ({ events: Array(12).fill(0), participants: Array(12).fill(0) })),
-  ]);
+  // Always keep full historical byYear trend (powers the bar chart)
+  const byYearPromise = getBeneficiariesByYear().catch(() => [] as BeneficiaryByYear[]);
 
-  const [eventsRes, totalOrgsRes, womenLedOrgsRes] = await Promise.all([
-    supabase.from("event").select("event_id", { count: "exact", head: true }),
-    supabase.from("organisation").select("org_id", { count: "exact", head: true }),
-    supabase.from("organisation").select("org_id", { count: "exact", head: true }).eq("woman_led", true),
+  // All other data respects active filters
+  const equityPromise = isFiltered
+    ? computeFilteredEquity(supabase, year, programme).catch(() => EQUITY_ZERO)
+    : getEquityDashboard().catch(() => EQUITY_ZERO);
+
+  const capitalPromise = isFiltered
+    ? computeFilteredCapital(supabase, year, programme).catch(() => [] as CapitalSummary[])
+    : getCapitalSummary().catch(() => [] as CapitalSummary[]);
+
+  const sectorsPromise = isFiltered
+    ? computeFilteredSectors(supabase, year, programme).catch(() => [] as { sector: string; count: number }[])
+    : getSectorBreakdown().catch(() => [] as { sector: string; count: number }[]);
+
+  const monthlyPromise = getMonthlyActivity(activeYear, eventType)
+    .catch(() => ({ events: Array(12).fill(0), participants: Array(12).fill(0) }));
+
+  // Events count filtered
+  let eventsQ = supabase.from("event").select("event_id", { count: "exact", head: true });
+  if (year) eventsQ = eventsQ.eq("edition_year", year);
+  if (eventType) eventsQ = eventsQ.eq("event_type", eventType);
+
+  const [equity, byYear, capital, sectors, monthly, eventsRes] = await Promise.all([
+    equityPromise, byYearPromise, capitalPromise, sectorsPromise, monthlyPromise, eventsQ,
   ]);
 
   const totalUSD          = capital.reduce((acc, r) => acc + (r.total_usd    ?? 0), 0);
   const usdToWomen        = capital.reduce((acc, r) => acc + (r.usd_to_women ?? 0), 0);
   const capitalToWomenPct = totalUSD > 0 ? Math.round((usdToWomen / totalUSD) * 100) : 0;
-  const womenLedPct       = (totalOrgsRes.count ?? 0) > 0
+
+  // Women-led % is structural — doesn't change with year/programme filter
+  const [totalOrgsRes, womenLedOrgsRes] = await Promise.all([
+    supabase.from("organisation").select("org_id", { count: "exact", head: true }),
+    supabase.from("organisation").select("org_id", { count: "exact", head: true }).eq("woman_led", true),
+  ]);
+  const womenLedPct = (totalOrgsRes.count ?? 0) > 0
     ? Math.round(((womenLedOrgsRes.count ?? 0) / (totalOrgsRes.count ?? 1)) * 100)
     : 0;
 
   return {
-    equity,
-    byYear,
-    capital,
-    sectors,
-    monthly,
+    equity, byYear, capital, sectors, monthly,
     events_count:         eventsRes.count ?? 0,
     total_usd:            totalUSD,
     capital_to_women_pct: capitalToWomenPct,

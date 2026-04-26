@@ -6,8 +6,13 @@ import { DiagnosticsTable } from "@/components/diagnostics/DiagnosticsTable";
 
 export const metadata = { title: "Business Diagnostics" };
 
-export default async function DiagnosticsPage() {
-  const diagnostics = await getDiagnostics();
+interface Props {
+  searchParams: { year?: string };
+}
+
+export default async function DiagnosticsPage({ searchParams }: Props) {
+  const year        = searchParams.year ? Number(searchParams.year) : undefined;
+  const diagnostics = await getDiagnostics({ year });
 
   return (
     <div className="flex flex-col gap-4">

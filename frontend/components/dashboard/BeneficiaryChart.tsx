@@ -1,17 +1,24 @@
 "use client";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
-  Tooltip, Legend, ResponsiveContainer,
+  Tooltip, Legend, ResponsiveContainer, Cell,
 } from "recharts";
 import type { BeneficiaryByYear } from "@/types";
 
-interface Props { data: BeneficiaryByYear[]; }
+interface Props {
+  data:       BeneficiaryByYear[];
+  activeYear?: number;
+}
 
-export function BeneficiaryChart({ data }: Props) {
+export function BeneficiaryChart({ data, activeYear }: Props) {
+  const title = activeYear
+    ? `Beneficiaries by year — ${activeYear} highlighted`
+    : "Beneficiaries by year — all programmes";
+
   return (
     <div className="isl-card">
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-        <p className="text-[12px] font-medium">Beneficiaries by year — all programmes</p>
+        <p className="text-[12px] font-medium">{title}</p>
         <a href="/people" className="text-[10px] text-[#1E40AF] hover:underline">Data table →</a>
       </div>
       <div className="px-4 py-3">
@@ -33,8 +40,24 @@ export function BeneficiaryChart({ data }: Props) {
               contentStyle={{ fontSize: 11, borderRadius: 8, border: "0.5px solid #EDE8F8" }}
               cursor={{ fill: "#EDE8F8" }}
             />
-            <Bar dataKey="female" name="Female" fill="#2D1B69" radius={[3,3,0,0]} />
-            <Bar dataKey="male"   name="Male"   fill="#38BDF8" radius={[3,3,0,0]} />
+            <Bar dataKey="female" name="Female" radius={[3,3,0,0]}>
+              {data.map((d) => (
+                <Cell
+                  key={d.year}
+                  fill={activeYear === d.year ? "#EC4899" : "#2D1B69"}
+                  opacity={activeYear && activeYear !== d.year ? 0.35 : 1}
+                />
+              ))}
+            </Bar>
+            <Bar dataKey="male" name="Male" radius={[3,3,0,0]}>
+              {data.map((d) => (
+                <Cell
+                  key={d.year}
+                  fill={activeYear === d.year ? "#0EA5E9" : "#38BDF8"}
+                  opacity={activeYear && activeYear !== d.year ? 0.35 : 1}
+                />
+              ))}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -47,10 +70,12 @@ export function BeneficiaryChart({ data }: Props) {
           <span className="w-2 h-2 rounded-full bg-[#38BDF8]" />
           <span className="text-[10px] text-muted-foreground">Male</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-[#EDE8F8] border border-[#7B5EA7]" />
-          <span className="text-[10px] text-muted-foreground">Youth</span>
-        </div>
+        {activeYear && (
+          <div className="ml-auto flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-[#EC4899]" />
+            <span className="text-[10px] text-muted-foreground">{activeYear} selected</span>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -306,13 +306,20 @@ export async function POST(req: Request) {
 
         // ── DIAGNOSTIC ────────────────────────────────────────
         case "diagnostic": {
+          // Alias common org identifier columns → org_id before resolution
+          if (!record.org_id) {
+            record = {
+              ...record,
+              org_id: record.business_name ?? record.company_name ?? record.organisation_name ?? record.org_name ?? null,
+            };
+          }
+
           let oid: string | null = record.org_id
             ? await resolveOrgId(String(record.org_id), db)
             : null;
 
-          // org_id is NOT NULL in diagnostic — auto-create a stub org so the row can
-          // import now. When the real org CSV is approved it upserts by isl_ref and
-          // fills in the full details; the diagnostic link survives intact.
+          // org_id is NOT NULL — auto-create a stub org so the row can import now.
+          // When the real org CSV is approved it upserts by isl_ref and fills details.
           if (!oid && record.org_id) {
             const ref = String(record.org_id).trim();
             if (!isUUID(ref)) {
@@ -324,25 +331,27 @@ export async function POST(req: Request) {
               if (stub?.org_id) {
                 oid = stub.org_id;
               } else {
-                // insert may fail if isl_ref already exists (race) — try fetching again
                 const { data: existing } = await db
                   .from("organisation").select("org_id").eq("isl_ref", ref).maybeSingle();
                 oid = existing?.org_id ?? null;
               }
             }
-            if (!oid) {
-              results.errors.push(`Diagnostic: could not resolve or create org "${record.org_id}" — row skipped`);
-              continue;
-            }
           }
 
-          // Alias common alternative column names before sanitise strips them
+          // org_id is NOT NULL — cannot proceed without one
+          if (!oid) {
+            results.errors.push(
+              `Diagnostic: org_id required — map 'business_name' or 'company_name' to org_id in the field mapper (got: "${record.org_id ?? ""}")`
+            );
+            continue;
+          }
+
+          // Alias common alternative date/tool column names before sanitise strips them
           if (record.assessment_date && !record.diag_date) record = { ...record, diag_date: record.assessment_date };
           if (record.evaluation_date && !record.diag_date) record = { ...record, diag_date: record.evaluation_date };
           if (record.date            && !record.diag_date) record = { ...record, diag_date: record.date };
 
-          // Infer tool_used from column pattern when not explicitly provided
-          // (tool_used is NOT NULL enum: ISL_Scorecard | SME_TA_Diagnosis | ILO_Acceleration | Lendability_Index | VIRAL_Assessment | Other)
+          // Infer tool_used from column pattern (NOT NULL enum in schema)
           if (!record.tool_used) {
             const rKeys = Object.keys(record).map(k => k.toLowerCase());
             const hasLend  = rKeys.some(k => k.includes("lendability") || k.includes("loan_purpose"));
@@ -356,9 +365,20 @@ export async function POST(req: Request) {
 
           const diagRec = sanitise({ ...record, org_id: oid }, "diagnostic");
 
-          // Both columns are NOT NULL — provide safe defaults rather than skipping the row
+          // NOT NULL defaults
           if (!diagRec.diag_date) diagRec.diag_date = new Date().toISOString().split("T")[0];
           if (!diagRec.tool_used) diagRec.tool_used = "Other";
+
+          // Coerce any text-in-numeric-field errors to null (e.g. "Average Competitiveness" in a score column)
+          const DIAG_NUMERIC = ["strategic_score","process_score","support_score","overall_score",
+            "market_expansion_score","production_score","financial_mgmt_score","operations_score",
+            "social_impact_score","lendability_score"];
+          for (const k of DIAG_NUMERIC) {
+            if (diagRec[k] !== null && diagRec[k] !== undefined) {
+              const v = Number(diagRec[k]);
+              diagRec[k] = isNaN(v) ? null : v;
+            }
+          }
 
           if (diagRec.isl_ref) {
             ({ error } = await db.from("diagnostic").upsert(diagRec, { onConflict: "isl_ref", ignoreDuplicates: false }));
@@ -557,6 +577,13 @@ export async function POST(req: Request) {
             { ...record, import_status: "Approved", data_sources: [source_name] },
             "person"
           );
+          // full_name is NOT NULL — give a clear error instead of a cryptic Supabase crash
+          if (!personRec.full_name) {
+            results.errors.push(
+              `Person: full_name is required — this file may belong to a different table (detected as: ${target_table}). Reject this entry from the queue.`
+            );
+            continue;
+          }
           // Use email_primary for dedup; fall back to isl_ref if no email
           const emailVal = String(personRec.email_primary ?? "").trim();
           if (emailVal && !emailVal.includes("placeholder")) {

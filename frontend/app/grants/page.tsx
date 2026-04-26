@@ -6,11 +6,11 @@ import { GrantsTable, GrantsSummary } from "@/components/grants/GrantsTable";
 
 export const metadata = { title: "Grants & Capital" };
 
-interface Props { searchParams: { funder?: string; year?: string; woman_led?: string } }
+interface Props { searchParams: { funder?: string; year?: string; programme?: string; woman_led?: string } }
 
 export default async function GrantsPage({ searchParams }: Props) {
   const [grants, summary] = await Promise.all([
-    getGrants({ funder: searchParams.funder, year: searchParams.year ? Number(searchParams.year) : undefined }),
+    getGrants({ funder: searchParams.funder, year: searchParams.year ? Number(searchParams.year) : undefined, programme: searchParams.programme }),
     getCapitalSummary(),
   ]);
 
@@ -28,7 +28,7 @@ export default async function GrantsPage({ searchParams }: Props) {
       />
       <GrantsSummary summary={summary} />
       <Suspense fallback={<div className="h-10 animate-pulse rounded-xl bg-white/50" />}>
-        <YearFilter showProgramme={false} />
+        <YearFilter showProgramme={true} />
       </Suspense>
       <Suspense fallback={<div className="h-64 animate-pulse rounded-xl bg-white/50" />}>
         <GrantsTable grants={grants} womanLed={searchParams.woman_led === "true"} />

@@ -7,13 +7,23 @@ import { FirstFemaleWidget } from "@/components/pitches/FirstFemaleWidget";
 
 export const metadata = { title: "Pitch Competitions" };
 
+// Programme → event_type enum mapping
+const PROG_TO_TYPE: Record<string, string> = {
+  FPN: "FPN", FIW: "FIW", GEW: "GEW", OSVP: "OSVP",
+  Dare2Aspire: "Dare2Aspire", SLEDP: "SLEDP", EWC: "EWC", NYEFF: "NYEFF",
+};
+
 interface Props { searchParams: { year?: string; winner?: string; programme?: string } }
 
 export default async function PitchesPage({ searchParams }: Props) {
+  const eventType = searchParams.programme && searchParams.programme !== "All"
+    ? PROG_TO_TYPE[searchParams.programme]
+    : undefined;
+
   const pitches = await getPitches({
-    year: searchParams.year ? Number(searchParams.year) : undefined,
-    event_type: searchParams.programme,
-    winner: searchParams.winner === "true",
+    year:       searchParams.year ? Number(searchParams.year) : undefined,
+    event_type: eventType,
+    winner:     searchParams.winner === "true",
   });
 
   return (
@@ -30,7 +40,7 @@ export default async function PitchesPage({ searchParams }: Props) {
       />
       <Suspense fallback={null}><FirstFemaleWidget /></Suspense>
       <Suspense fallback={<div className="h-10 animate-pulse rounded-xl bg-white/50" />}>
-        <YearFilter />
+        <YearFilter showProgramme={true} />
       </Suspense>
       <Suspense fallback={<div className="h-64 animate-pulse rounded-xl bg-white/50" />}>
         <PitchesTable pitches={pitches} />
